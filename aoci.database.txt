@@ -1,0 +1,13 @@
+#AOCI-DATABASE-VOLUME: 1
+
+===platform2/public/database://platform2/public/===
+ai_chat_message[MA7T]: F:保存对话会话中的用户与助手消息正文 | R:database://platform2/public/ai_chat_session,code:server/app/api/v1/ai.py | A:主键id；session_id外键会话 | S:流结束时助手消息可写成占位摘要而非完整SSE全文
+ai_chat_session[SA7T]: F:记录一次AI对话会话及其所属用户 | R:database://platform2/public/users,database://platform2/public/ai_chat_message,code:server/app/api/v1/ai.py | A:主键id为应用生成字符串 | S:删除会话时应用先删消息再删会话，外键删除为no action
+ai_tool_call[LA7T]: F:记录对话中工具调用摘要供审计回看 | R:code:server/app/api/v1/ai.py | A:按session_id索引查询 | S:session_id无外键，会话删除后工具日志可成孤儿行
+dify_agent_registry[EC7T]: F:登记可被Harness匹配的Dify垂域应用 | R:code:server/app/api/v1/admin_dify.py,code:server/app/api/v1/internal.py | A:app_id业务唯一键 | S:Harness只消费enabled为真的注册项做意图匹配
+sit_aircraft_point[TB8T]: F:存储飞机态势观测点位时空坐标 | R:code:server/app/api/v1/situation.py,code:server/app/services/seed.py | A:按aircraft_id与observed_at检索 | S:实时接口按observed_at倒序后在应用层折叠为每机最新一点
+sit_image_detection_result[MB7T]: F:保存单张任务图像上的飞机检测点 | R:database://platform2/public/sit_task_image,code:server/app/services/seed.py | A:image_id外键任务图像 | S:一期检测点由种子造数写入，不依赖在线检测服务落库
+sit_task_image[MB7T]: F:记录检测任务收到的图像及其接收时刻 | R:database://platform2/public/sit_task_info,database://platform2/public/sit_image_detection_result,code:server/app/api/v1/situation.py | A:主键id；task_id外键任务 | S:时间轴帧按received_at秒级分桶，缺图时刻不生成帧
+sit_task_info[EB8T]: F:描述图像检测任务的标识、状态与起止时间 | R:database://platform2/public/sit_task_image,database://platform2/public/sit_track,code:server/app/api/v1/situation.py | A:主键id为业务任务字符串 | S:任务列表与航迹/时间轴都依赖此表作为任务根对象
+sit_track[AB7T]: F:保存同任务飞机检测点合批后的航迹 | R:database://platform2/public/sit_task_info,code:server/app/api/v1/situation.py,code:server/app/services/seed.py | A:task_id外键任务；aircraft_id区分航迹 | S:points_json为应用序列化的点列文本，库内无几何类型或校验
+users[EI8T]: F:存储平台登录账号、角色与口令哈希 | R:database://platform2/public/ai_chat_session,code:server/app/core/security.py,code:server/app/api/v1/auth.py | A:username唯一；role区分权限 | S:password_hash为bcrypt密文；JWT sub取username而非数字id

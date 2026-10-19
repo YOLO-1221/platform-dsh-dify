@@ -1,0 +1,21 @@
+.DS_Store
+node_modules/
+web/dist/
+web/node_modules/
+server/.venv/
+server/**/__pycache__/
+server/*.db
+server/.env
+.dsh-home/
+.run/
+# Vendored DeepSeek Harness (own git tree + heavy build artifacts)
+deepseek-harness/node_modules/
+deepseek-harness/.dsh-build/
+deepseek-harness/**/node_modules/
+# Official Dify checkout secrets and bind-mounted data
+dify/docker/.env
+dify/docker/volumes/
+services/**/__pycache__/
+.aoci/ledger.jsonl
+.aoci/verify_history/
+*.pyc

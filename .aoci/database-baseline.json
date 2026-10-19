@@ -1,0 +1,154 @@
+{
+  "version": "database-evidence-baseline/v1",
+  "sources": [
+    {
+      "source_id": "platform2",
+      "engine": "postgresql",
+      "database": "platform2",
+      "namespaces": [
+        "public"
+      ],
+      "include_namespaces": [],
+      "exclude_namespaces": [],
+      "include_tables": [],
+      "exclude_tables": [],
+      "case_semantics": {
+        "identifier_case": "preserve_quoted_fold_unquoted_lower"
+      },
+      "evidence_version": "database-evidence/v1",
+      "source_snapshot_sha256": "c968b05e317401ff0c274b50e00841c34432f733602494fc7de61e4f61a93ce2",
+      "tables": [
+        {
+          "object_ref": "database://platform2/public/ai_chat_message",
+          "table_evidence_sha256": "b769309d73c91e2908dd73730658e14016ecd7f5ceaa12b5f163f6ee4ec032c6",
+          "component_hashes": {
+            "columns": "e4a802053303061f970d4ebcc5cddffbbf93233ab6ce99970c245f906c3129eb",
+            "primary_key": "caa5008f356007583e5adf6acf5a31646392c085d612e98f7e88640b6618a7fb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "34477ec9541362dc64d222af8e90c65a2fddc9892416958a8b5865ff3ce31103",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "261d2dcc26fed13700975dafa4268b11105559e41c7e17a0cb5f756b1f83e564",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/ai_chat_session",
+          "table_evidence_sha256": "00299c990fcf78c4c33a81a1c71892af5f162e3a3373709b8bbfe0f15a627bf5",
+          "component_hashes": {
+            "columns": "92928203fb709c3f4820613ec44aaa16a216c60be187f7b106796d3ba00e6808",
+            "primary_key": "9d57d2edfe0a7fcf7b06ce78b134e74c0b6a04d4eff5e2ea7f714f6826cb0921",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "f3b7442ecd1ca8c693e8651c90381b682e889bab4be5fd42dff223ad73c427e7",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "de318ac4d9f643a9b473a0c6b9fdea5d659acde395b47882ecf3653b12486173",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/ai_tool_call",
+          "table_evidence_sha256": "bf429d3f2daf3387b3299a929e82cd851c4fb6abf852732a67ddff02fdd8deb6",
+          "component_hashes": {
+            "columns": "383ab5cf8c20808de4a563bb48698f9d5c3711e45528e23cceb215f5c3d45556",
+            "primary_key": "f48d1cb65967a4f2c0dfb39136bab0daa9dc1e57db244b3321d27723a0f250b8",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "9ca1351c00d092df461a3e5949da26f306b921019e2cc00a87c40d74d625b9f5",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/dify_agent_registry",
+          "table_evidence_sha256": "5328de02d390977ea4ad21eb008da4541aeeb6cd841a1e96523d5a86eb63dfdd",
+          "component_hashes": {
+            "columns": "cb7ed177a48807a15b94f2c5c36b882b900e46e90d5dc4ec149ed9ba3b7c88b7",
+            "primary_key": "4d4710524aab856eafbc2665c8cefac80e72409274cb845d01f56d2ca0c01586",
+            "unique_constraints": "1190bc4994a2da311d7cd4947f87ab20be2d4a2a1301e5a09c8be79b3f5e8c2f",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "c6ea73720022872f6a378f7a522e2a30fffb69dd028d9536d08cd61b19297f72",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/sit_aircraft_point",
+          "table_evidence_sha256": "8cc2ede03d73ef94407cc849f39198f92e9f2adb8c28398047089d4e5708b1fb",
+          "component_hashes": {
+            "columns": "b5d34b0ad371e953f197ff815eaa4ee3c4f7fb5dc1a45bb8ef9f4561598da990",
+            "primary_key": "60c15670b78f19d210658d4ffa5d846d6c244be72a7ab5d7b996bf7b6c14f3cb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "879ba750ae6f8d8c029c7fd385c716c6cae065546b29c449ff7dfaa765038685",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/sit_image_detection_result",
+          "table_evidence_sha256": "80a06d60051e5eec4b79450c85a72492062a0c58ba9f816f50aeb562db2b9d59",
+          "component_hashes": {
+            "columns": "895f2b4e3978517852baf0e4a646572495f8038491a98c99f8bbed3bbcc87561",
+            "primary_key": "94c159bd9a6558a875f6a94a5a886bd1746a7b5528ffc3b4e10b2f2f34b1c5a1",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "81f1062f21acc85739d3d64b38661712f24110d586892a5f6c5bd5f57094c39e",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "2908410c296e1bd0df8a8cced5270dac64688419c506a78e12806b70a3d1b578",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/sit_task_image",
+          "table_evidence_sha256": "ba5ff24d07de71e9fe5b5ff2f92fe6c22fed133089fc5b7eb3015330e72add93",
+          "component_hashes": {
+            "columns": "461c364427661a6d88580c32283460693d2646bb3573d21d8ea1c1b2f8f55298",
+            "primary_key": "d2c5ce659cfab47e8cf9941d9b2c801c0b4ddc8b452dbde3a61993332f2b49f8",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "3be165f4c0a5d4cd78e68e71faf7f91e2c76e90fa25ece7a8369cb3907c1de51",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "874bf4850ae80eb53eae86f2cb61bc0a277176f7b8a04318038dec7f997bfb7e",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/sit_task_info",
+          "table_evidence_sha256": "fccebc3b395bf3303b99a5e97b49f1a2a291d0c72eac6a95e3aeea11de8f8572",
+          "component_hashes": {
+            "columns": "49a4343f787fd767319bd95597445665e5fbec0acfdb0bef05ac55c3161b6afb",
+            "primary_key": "fafddc6adf189993298019deb202def15bb331444315a92a8dba71297845faab",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "b06b1f0841346bcb3f45b2204ce524613d312e75b9888e275126dea444289b12",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/sit_track",
+          "table_evidence_sha256": "a06c6662d79eb4f3dde75e90ad557958151bfddd862cf30e49d3a4d9c5e40174",
+          "component_hashes": {
+            "columns": "5d00b042c0e2676fb0410a8b3fba3179dc1dbba61a44c28762e15a598366bc34",
+            "primary_key": "c5c29ef3e67fb5db149bd8d101d1937126fe0f4f96491f5fcf5c29115a25b61d",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "2d186600d4afc16bc2bdf428d8ab42baf09cf3f796b86be93a45fd88b6987d12",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "1dfe0848e663195ad5bc57a9c9ce34c8b920a35aaf979ab225469e294f981141",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://platform2/public/users",
+          "table_evidence_sha256": "4672ae2f136e378b3304c07fad4005b5bd132d618271f1b43c269f83cb33bbfa",
+          "component_hashes": {
+            "columns": "89103ba13be919cc8fa7a46d55a9df32f8519ad57865294f10dac38c9c7ce237",
+            "primary_key": "d2c4cb3998067e6bae51e2cc9cb9ddda49a9cb2c527355b9f897165fefb59f07",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "27aac3568dd74893880e6dba327e3c3985b9df415e0d21b901d581be4f36ab4c",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        }
+      ]
+    }
+  ]
+}

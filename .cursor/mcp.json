@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aoci": {
+      "command": "/Users/yolo/.local/bin/aoci",
+      "args": ["--repo", "/Users/yolo/project/VueProject/2026/platform2", "mcp"]
+    }
+  }
+}

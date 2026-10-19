@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# stdio MCP for dsh: route utterances to registered Dify apps.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$ROOT/server/.venv/bin/python"
+if [[ ! -x "$PY" ]]; then
+  echo "missing $PY" >&2
+  exit 1
+fi
+export PLATFORM2_API_BASE="${PLATFORM2_API_BASE:-http://127.0.0.1:8000}"
+export PLATFORM2_DIFY_BASE="${PLATFORM2_DIFY_BASE:-http://127.0.0.1:5001}"
+export PLATFORM2_SERVICE_TOKEN="${PLATFORM2_SERVICE_TOKEN:-platform2-dify-local}"
+exec "$PY" "$ROOT/services/dify_mcp/server.py"

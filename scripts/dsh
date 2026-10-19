@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Run DeepSeek Harness CLI from the vendored tree under this repo.
+# Usage: ./scripts/dsh web
+#        ./scripts/dsh --profile web ...
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+HARNESS="$ROOT/deepseek-harness"
+if [[ ! -f "$HARNESS/package.json" ]]; then
+  echo "missing vendored harness at $HARNESS" >&2
+  exit 1
+fi
+# Project-local home by default; override with DSH_HOME=... or use ~/.dsh via DSH_HOME="$HOME/.dsh"
+export DSH_HOME="${DSH_HOME:-$ROOT/.dsh-home}"
+mkdir -p "$DSH_HOME"
+cd "$HARNESS"
+exec pnpm dsh "$@"
