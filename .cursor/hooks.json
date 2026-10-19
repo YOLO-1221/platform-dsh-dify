@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/aoci-mark-dirty.sh"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/aoci-stop-remind.sh",
+        "loop_limit": 2
+      }
+    ]
+  }
+}

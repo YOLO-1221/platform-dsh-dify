@@ -1,13 +1,23 @@
-"""Service-token endpoints used by the local Dify runner and Harness bridge."""
+"""Service-token endpoints used by Dify tools, local runners, and Harness bridge."""
+
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db import get_db
 from app.models import DifyAgentRegistry, SitAircraftPoint, SitTaskInfo
+from app.services.situation_query import build_points_response, build_tracks_response
 
 router = APIRouter(prefix="/internal", tags=["internal"])
+
+
+class TimeRangeBody(BaseModel):
+    aircraft_id: str | None = Field(default=None, description="可选飞机编号")
+    start_time: datetime = Field(description="查询开始时间（含）")
+    end_time: datetime = Field(description="查询结束时间（含）")
 
 
 def require_service(authorization: str | None = Header(default=None)) -> None:
@@ -16,7 +26,7 @@ def require_service(authorization: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=401, detail="invalid service token")
 
 
-@router.get("/dify/apps")
+@router.get("/dify/apps", operation_id="internal_list_dify_apps")
 def list_apps(_: None = Depends(require_service), db: Session = Depends(get_db)):
     rows = db.query(DifyAgentRegistry).all()
     return {
@@ -35,8 +45,9 @@ def list_apps(_: None = Depends(require_service), db: Session = Depends(get_db))
     }
 
 
-@router.get("/situation/aircraft/realtime")
+@router.get("/situation/aircraft/realtime", operation_id="internal_get_realtime_aircraft_points")
 def realtime(_: None = Depends(require_service), db: Session = Depends(get_db)):
+    """服务令牌：每架飞机最新实时态势点位。"""
     rows = db.query(SitAircraftPoint).order_by(SitAircraftPoint.observed_at.desc()).limit(50).all()
     latest = {}
     for row in rows:
@@ -51,12 +62,46 @@ def realtime(_: None = Depends(require_service), db: Session = Depends(get_db)):
                 "observed_at": r.observed_at.isoformat(),
             }
             for r in latest.values()
-        ]
+        ],
+        "count": len(latest),
     }
 
 
-@router.get("/situation/task/list")
+@router.post("/situation/aircraft/query", operation_id="internal_query_aircraft_points")
+def query_points(
+    body: TimeRangeBody,
+    _: None = Depends(require_service),
+    db: Session = Depends(get_db),
+):
+    """服务令牌：按时间查态势点位（供 Dify Custom Tool / OpenAPI 导入）。"""
+    return build_points_response(
+        db,
+        aircraft_id=body.aircraft_id,
+        start_time=body.start_time,
+        end_time=body.end_time,
+        require_time_range=True,
+    )
+
+
+@router.post("/situation/aircraft/tracks", operation_id="internal_query_aircraft_tracks")
+def query_tracks(
+    body: TimeRangeBody,
+    _: None = Depends(require_service),
+    db: Session = Depends(get_db),
+):
+    """服务令牌：按时间查态势航迹（供 Dify Custom Tool / OpenAPI 导入）。"""
+    return build_tracks_response(
+        db,
+        aircraft_id=body.aircraft_id,
+        start_time=body.start_time,
+        end_time=body.end_time,
+        require_time_range=True,
+    )
+
+
+@router.get("/situation/task/list", operation_id="internal_list_detection_tasks")
 def tasks(_: None = Depends(require_service), db: Session = Depends(get_db)):
+    """服务令牌：检测任务列表。"""
     rows = db.query(SitTaskInfo).order_by(SitTaskInfo.start_time.desc()).all()
     return {
         "tasks": [

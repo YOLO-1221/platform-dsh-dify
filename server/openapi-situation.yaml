@@ -1,0 +1,237 @@
+openapi: 3.0.3
+info:
+  title: platform2 Situation Tools
+  description: |
+    供 Dify「自定义工具 / OpenAPI」导入的裁剪版态势接口。
+    使用服务令牌鉴权（与 PLATFORM2_SERVICE_TOKEN 一致，默认 platform2-dify-local）。
+
+    Dify 在 Docker 内访问宿主机后端时，servers.url 使用 host.docker.internal。
+    若你改了端口或部署方式，请同步修改 servers。
+  version: "1.0.0"
+servers:
+  - url: http://host.docker.internal:8000
+    description: Docker Desktop 访问宿主机 FastAPI
+  - url: http://127.0.0.1:8000
+    description: 本机直连（非 Docker 场景）
+tags:
+  - name: situation
+    description: 态势点位与航迹
+paths:
+  /api/v1/internal/situation/aircraft/realtime:
+    get:
+      operationId: internal_get_realtime_aircraft_points
+      summary: 查询实时态势点位
+      description: 返回每架飞机最新一点，用于实时标绘。
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointsResponse"
+        "401":
+          description: 服务令牌无效
+
+  /api/v1/internal/situation/aircraft/query:
+    post:
+      operationId: internal_query_aircraft_points
+      summary: 按时间查询态势点位
+      description: 按 start_time/end_time（必填）与可选 aircraft_id 查询点位，供地球标绘。
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeRangeBody"
+            example:
+              start_time: "2026-10-16T05:00:00"
+              end_time: "2026-10-16T08:00:00"
+              aircraft_id: null
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointsResponse"
+        "400":
+          description: 参数错误
+        "401":
+          description: 服务令牌无效
+
+  /api/v1/internal/situation/aircraft/tracks:
+    post:
+      operationId: internal_query_aircraft_tracks
+      summary: 按时间查询态势航迹
+      description: |
+        将时间窗内的态势点位按 aircraft_id 分组、按时间排序，合成折线航迹。
+        点数少于 2 的飞机不生成航迹。
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeRangeBody"
+            example:
+              start_time: "2026-10-16T05:00:00"
+              end_time: "2026-10-16T08:00:00"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TracksResponse"
+        "400":
+          description: 参数错误
+        "401":
+          description: 服务令牌无效
+
+  /api/v1/internal/situation/task/list:
+    get:
+      operationId: internal_list_detection_tasks
+      summary: 列出检测任务
+      description: 返回图像检测任务列表（与态势观测航迹不同）。
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TaskItem"
+
+components:
+  securitySchemes:
+    ServiceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: service-token
+      description: |
+        Authorization: Bearer <PLATFORM2_SERVICE_TOKEN>
+        默认值 platform2-dify-local
+  schemas:
+    TimeRangeBody:
+      type: object
+      required: [start_time, end_time]
+      properties:
+        start_time:
+          type: string
+          format: date-time
+          description: 查询开始时间（含）
+        end_time:
+          type: string
+          format: date-time
+          description: 查询结束时间（含）
+        aircraft_id:
+          type: string
+          nullable: true
+          description: 可选飞机编号过滤
+    AircraftPoint:
+      type: object
+      properties:
+        aircraft_id:
+          type: string
+        lon:
+          type: number
+        lat:
+          type: number
+        alt:
+          type: number
+        observed_at:
+          type: string
+          format: date-time
+    PointsResponse:
+      type: object
+      properties:
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/AircraftPoint"
+        count:
+          type: integer
+        truncated:
+          type: boolean
+        start_time:
+          type: string
+          nullable: true
+        end_time:
+          type: string
+          nullable: true
+        aircraft_id:
+          type: string
+          nullable: true
+    TrackPoint:
+      type: object
+      properties:
+        lon:
+          type: number
+        lat:
+          type: number
+        alt:
+          type: number
+        time_ms:
+          type: integer
+        observed_at:
+          type: string
+          format: date-time
+    TrackItem:
+      type: object
+      properties:
+        aircraft_id:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackPoint"
+    TracksResponse:
+      type: object
+      properties:
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackItem"
+        count:
+          type: integer
+        point_count:
+          type: integer
+        truncated:
+          type: boolean
+        start_time:
+          type: string
+          nullable: true
+        end_time:
+          type: string
+          nullable: true
+        aircraft_id:
+          type: string
+          nullable: true
+    TaskItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        start_time:
+          type: string
+        end_time:
+          type: string

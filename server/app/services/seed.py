@@ -56,23 +56,11 @@ def ensure_seed_data():
                 )
             )
 
-        if not db.query(SitAircraftPoint).first():
-            now = datetime.utcnow()
-            aircraft = ["UA001", "UA002", "UA003"]
-            for i, aid in enumerate(aircraft):
-                for j in range(8):
-                    db.add(
-                        SitAircraftPoint(
-                            aircraft_id=aid,
-                            lon=116.2 + i * 0.15 + j * 0.01,
-                            lat=39.8 + i * 0.08 + j * 0.005,
-                            alt=7000 + i * 300,
-                            observed_at=now - timedelta(minutes=20 - j * 2),
-                        )
-                    )
+        # 演示态势点：始终刷新 UA00x，保证「最近 N 小时」时间窗可查可连航迹
+        _seed_situation_aircraft_points(db)
 
         if not db.query(SitTaskInfo).first():
-            start = datetime.utcnow().replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+            start = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
             end = start + timedelta(minutes=40)
             task_id = "task-demo-1"
             db.add(
@@ -141,3 +129,37 @@ def ensure_seed_data():
         db.commit()
     finally:
         db.close()
+
+
+def _seed_situation_aircraft_points(db):
+    """Write dense, recent tracks for demo aircraft (safe to re-run)."""
+    demo_ids = ["UA001", "UA002", "UA003", "UA004"]
+    db.query(SitAircraftPoint).filter(SitAircraftPoint.aircraft_id.in_(demo_ids)).delete(
+        synchronize_session=False
+    )
+
+    # 与前端 el-date-picker 本地时间一致，避免 utcnow + ISO Z 造成查空
+    now = datetime.now().replace(second=0, microsecond=0)
+    # 每机 24 点，间隔 5 分钟，覆盖最近约 2 小时，便于按时间查点/连航迹
+    steps = 24
+    step_minutes = 5
+    routes = [
+        # aid, lon0, lat0, dlon, dlat, alt
+        ("UA001", 116.20, 39.80, 0.012, 0.006, 7000),
+        ("UA002", 116.35, 39.88, 0.010, -0.004, 7300),
+        ("UA003", 116.50, 39.96, -0.008, 0.005, 7600),
+        ("UA004", 116.28, 39.92, 0.006, 0.008, 6900),
+    ]
+    for aid, lon0, lat0, dlon, dlat, alt in routes:
+        for j in range(steps):
+            # j=0 最旧，j=steps-1 最新（贴近 now）
+            age = (steps - 1 - j) * step_minutes
+            db.add(
+                SitAircraftPoint(
+                    aircraft_id=aid,
+                    lon=lon0 + j * dlon,
+                    lat=lat0 + j * dlat,
+                    alt=alt + (j % 5) * 20,
+                    observed_at=now - timedelta(minutes=age),
+                )
+            )

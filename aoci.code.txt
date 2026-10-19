@@ -3,22 +3,27 @@
 ===/Users/yolo/project/VueProject/2026/platform2/===
 .gitattributes[FR8T]: F:强制文本以LF检出以保证AOCI Baseline跨平台字节一致 | R:- | A:* text=auto eol=lf | S:覆盖Windows autocrlf；若不强制LF，checkout后整树会被标为stale
 AGENTS.md[SG9S]: F:规定Agent接入、使用与维护本仓库AOCI认知的强制合同 | R:code:.cursor/mcp.json | A:aoci区块定义rules/overview/maintain/update_entry入口与收尾义务 | S:Entry语义必须来自对真实证据的理解，禁止仅凭路径、AST或模板生成；压缩handoff不得保留Whole-Index正文
-.gitignore[FV5T]: F:忽略venv、node_modules、dist、.dsh-home、harness构建与Dify机密 | R:- | A:web/server构建产物与dify/docker/.env、volumes不入库 | S:dify源码可入库，仅忽略.env与volumes
-README.md[SG7T]: F:说明platform2前后端、PostgreSQL、官方Dify与dsh启动 | R:code:scripts/start-dify.sh,code:scripts/dify-mcp,code:scripts/dsh | A:web/server、start-dify与dsh web | S:管理页填关键字与API Key后需新开dsh会话，命中才调Dify
+.gitignore[FV5T]: F:忽略venv、node_modules、dist、.run、.dsh-home、harness构建与Dify机密 | R:- | A:web/server构建产物、.run运行态与dify/docker/.env、volumes不入库 | S:dify源码可入库；.aoci/ledger与verify_history本地审计也不入库
+README.md[SG7T]: F:说明platform2前后端、PostgreSQL、官方Dify与dsh启动 | R:code:start.sh,code:scripts/start-ai-stack.sh,code:scripts/dsh | A:分步启动与./start.sh一键栈；默认operator/admin账号 | S:对话走:3081 harness-bridge，勿与dsh web抢:3080；Dify Compose占宿主5001
+start.sh[OW7M]: F:一键启动/停止/查询API、web、bridge、dsh与Dify | R:code:stop.sh,code:scripts/start-ai-stack.sh,code:scripts/dsh | A:./start.sh与status/stop；PID写入.run | S:Docker不可用时跳过Dify继续本地服务；勿在同一行粘贴start+status+stop
+stop.sh[OW4T]: F:转发到start.sh stop停止整栈 | R:code:start.sh | A:./stop.sh | S:-
 
 ===/Users/yolo/project/VueProject/2026/platform2/.cursor/===
 mcp.json[FC7T]: F:声明Cursor宿主对本仓库的AOCI stdio MCP接入 | R:- | A:mcpServers.aoci以command与args启动本机aoci并绑定--repo | S:command与args为本机绝对路径，换机或移动仓库后必须重写，提交到其他机器会失效
+hooks.json[XV6T]: F:注册对话后AOCI自动收尾的Cursor钩子 | R:code:.cursor/hooks/aoci-mark-dirty.sh,code:.cursor/hooks/aoci-stop-remind.sh | A:afterFileEdit打脏标记；stop不对齐则followup | S:loop_limit=2
 
 ===/Users/yolo/project/VueProject/2026/platform2/doc/===
-LLM_BUILD_PROMPT.md[SB8S]: F:把PRD V1.4压成可开工骨架指令 | R:code:doc/PRD.md | A:技术栈、目录、注册表字段、MCP路由与SSE约束 | S:查询模式必须暂停实时刷新；dsh按关键字调Dify
-PRD.md[SB9M]: F:规定态势平台范围、Dify注册页与 dsh 关键字调度契约 | R:code:doc/LLM_BUILD_PROMPT.md,code:web/src/views/AdminDifyView.vue,code:services/dify_mcp/server.py | A:V1.4 覆盖态势查询、任务航迹、/admin/dify 与 route_dify_message | S:查询模式暂停实时刷新；一期检测允许造数；无 API Key 不请求 Dify
+LLM_BUILD_PROMPT.md[SB8S]: F:把PRD压成可开工骨架指令 | R:code:doc/PRD.md | A:技术栈、目录、注册表字段、MCP路由与SSE约束 | S:查询模式必须暂停实时刷新；dsh按关键字调Dify
+PRD.md[SB9M]: F:规定态势平台范围、Dify注册页与dsh关键字调度契约 | R:code:doc/LLM_BUILD_PROMPT.md,code:web/src/views/AdminDifyView.vue,code:services/dify_mcp/server.py | A:覆盖态势查询、任务航迹、/admin/dify与route_dify_message | S:查询模式暂停实时刷新；一期检测允许造数；无API Key不请求Dify
 log.md[SG3T]: F:按日记录platform2开发变更要点 | R:- | A:- | S:-
+AOCI_MAINTAIN.md[SG7T]: F:说明对话后自动更新AOCI的钩子与Maintain流程 | R:code:AGENTS.md,code:.cursor/hooks.json | A:afterFileEdit+stop自动跟进与MCP收尾步骤 | S:钩子只驱动Agent写语义，禁止手改Volume
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/===
 README.md[SG6T]: F:说明FastAPI安装启动与Harness/Dify对接 | R:code:server/requirements.txt,code:scripts/dify-mcp | A:venv+pip+uvicorn --port 8000 | S:默认转发3080；管理员登记API Key后dsh才真正调Dify
 alembic.ini[FV5T]: F:配置Alembic脚本目录与默认PostgreSQL连接 | R:code:server/alembic/env.py | A:script_location=alembic | S:实际URL由env.py用settings.database_url覆盖
 requirements.txt[FV6T]: F:锁定后端Python依赖版本 | R:code:server/app/main.py,code:server/app/db.py | A:fastapi/sqlalchemy/psycopg/alembic/bcrypt | S:使用psycopg3连PostgreSQL，以及bcrypt而非passlib
 .env.example[FC4T]: F:给出本地可覆盖的PLATFORM2_环境变量样例 | R:code:server/app/core/config.py | A:DATABASE_URL、Harness/Dify地址与mock开关 | S:Settings不会自动读取此文件，需导出同名变量才生效
+openapi-situation.yaml[FI7M]: F:供Dify Custom Tool导入的态势内部OpenAPI | R:code:server/app/api/v1/internal.py | A:描述/api/v1/internal/situation实时、query与tracks | S:需Bearer service_token；时间字段按本地naive datetime理解
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/alembic/===
 env.py[RV6T]: F:加载模型元数据并按settings执行Alembic迁移 | R:code:server/app/db.py,code:server/app/core/config.py | A:offline/online双路径run_migrations | S:必须import app.models以注册全部表
@@ -29,21 +34,24 @@ script.py.mako[FV3T]: F:生成Alembic版本文件的mako模板 | R:- | A:upgrade
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/app/api/===
 deps.py[II7T]: F:解析Bearer JWT并注入当前用户与管理员校验 | R:code:server/app/core/security.py | A:get_current_user/require_admin | S:缺少凭证或角色非admin时分别返回401/403
+__init__.py[LZ1T]: F:标记server.app.api为Python包 | R:- | A:- | S:-
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/app/api/v1/===
 admin_dify.py[IB6T]: F:管理员维护Dify注册表含关键字与API Key | R:code:server/app/api/deps.py | A:GET/POST /admin/dify与PUT/DELETE /admin/dify/{app_id} | S:仅require_admin；更新时空API Key不覆盖已有密钥
 ai.py[IA8S]: F:会话管理与SSE对话流，默认转发Harness桥 | R:code:server/app/core/config.py,code:services/harness_bridge/app.py | A:thinking/tool_call/tool_result/answer事件 | S:use_mock_ai为false时读取harness /v1/chat/stream并在tool_result时写AiToolCall
 auth.py[EI7T]: F:账号密码登录并签发JWT | R:code:server/app/core/security.py | A:POST /auth/login | S:校验失败统一401不区分用户是否存在细节
-situation.py[IB8S]: F:提供态势点位、任务列表、时间轴帧与航迹查询 | R:code:server/app/models/sit_tables.py | A:realtime/query/task timeline/track接口 | S:时间轴按接收秒分桶成帧；航迹骨架返回首条飞机轨迹
-internal.py[II7S]: F:为MCP与Harness提供含密钥的注册表及态势任务 | R:code:server/app/core/config.py,code:server/app/models/base_tables.py | A:GET /internal/dify/apps与/internal/situation/* | S:Authorization必须精确等于Bearer加service_token，不接受用户JWT
+situation.py[IB8S]: F:提供态势实时点、时间查询、多机航迹与检测任务时间轴 | R:code:server/app/services/situation_query.py,code:server/app/models/sit_tables.py | A:/aircraft/realtime|query|tracks与/task timeline/track | S:tracks强制时间窗；task/track取SitTrack骨架而非观测点合批
+internal.py[II7S]: F:为MCP/Harness/Dify工具提供含密钥的注册表与态势查询 | R:code:server/app/core/config.py,code:server/app/services/situation_query.py | A:GET /internal/dify/apps与/internal/situation/*；tracks/query需时间窗 | S:Authorization须精确等于Bearer加service_token，不接受用户JWT
+__init__.py[LZ1T]: F:标记server.app.api.v1为Python包 | R:- | A:- | S:-
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/app/core/===
-config.py[RC8T]: F:集中读取PLATFORM2_环境变量与默认运行配置 | R:- | A:Settings含PostgreSQL地址、mock开关、harness/dify与service_token | S:环境变量前缀必须为PLATFORM2_；默认库为本机platform2
+config.py[RC8T]: F:集中读取PLATFORM2_环境变量与默认运行配置 | R:- | A:Settings含PostgreSQL、harness:3081、dify:5001与service_token | S:环境变量前缀必须为PLATFORM2_；默认库为本机platform2
 security.py[RI8T]: F:bcrypt哈希密码并签发HS256 JWT | R:code:server/app/core/config.py | A:hash_password/verify_password/create_access_token | S:直接使用bcrypt库，不用passlib以免新版不兼容
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/app/===
 db.py[RP7T]: F:创建SQLAlchemy引擎、Session与Declarative基类 | R:code:server/app/core/config.py | A:get_db生成器 | S:SQLite时必须check_same_thread=False
 main.py[EA8T]: F:组装FastAPI并在启动时建表、补列与种子造数 | R:code:server/app/services/seed.py | A:挂载auth/ai/admin_dify/situation/internal路由 | S:create_all之后再ensure_registry_columns，否则旧表缺关键字列
+__init__.py[LZ1T]: F:标记server.app为Python包 | R:- | A:- | S:-
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/app/models/===
 __init__.py[CP5T]: F:导出全部ORM模型供迁移与业务导入 | R:code:server/app/models/base_tables.py,code:server/app/models/sit_tables.py | A:__all__列举users与sit_模型 | S:-
@@ -51,7 +59,8 @@ base_tables.py[PD7S]: F:定义用户、Dify注册表与AI会话消息工具日�
 sit_tables.py[PD8S]: F:定义sit_前缀态势点、任务、图片、检测点与航迹表 | R:code:server/app/db.py | A:SitAircraftPoint到SitTrack五张业务表 | S:航迹点以points_json文本存储
 
 ===/Users/yolo/project/VueProject/2026/platform2/server/app/services/===
-seed.py[DB8S]: F:补注册表列并幂等写入演示用户与造数 | R:code:server/app/models/base_tables.py,code:server/app/core/security.py | A:ensure_registry_columns与ensure_seed_data | S:写检测点前先flush任务与图片；空关键字的两个预置应用会回填
+seed.py[DB8S]: F:补注册表列并幂等写入演示用户与态势造数 | R:code:server/app/models/base_tables.py,code:server/app/core/security.py | A:ensure_registry_columns与ensure_seed_data | S:每次启动按本地now刷新UA001-4近时点，保证时间窗查询与航迹可演示
+situation_query.py[DB7S]: F:共享态势点查询与按机号合批航迹响应 | R:code:server/app/models/sit_tables.py,code:server/app/api/v1/situation.py,code:server/app/api/v1/internal.py | A:build_points_response与build_tracks_response | S:默认上限2000点并标truncated；航迹仅保留≥2点的机号序列
 
 ===/Users/yolo/project/VueProject/2026/platform2/web/===
 .gitignore[FV4T]: F:忽略前端node_modules与dist | R:- | A:Vite默认忽略项 | S:-
@@ -81,7 +90,7 @@ vite.svg[FU2T]: F:Vite模板品牌SVG资源 | R:- | A:静态资源 | S:-
 vue.svg[FU2T]: F:Vue模板品牌SVG资源 | R:- | A:静态资源 | S:-
 
 ===/Users/yolo/project/VueProject/2026/platform2/web/src/modules/cesiumRender/===
-CesiumViewer.vue[AU8S]: F:封装Cesium地球并按props绘制点位与截断航迹 | R:- | A:points/track/currentFrameTimeMs驱动Entity | S:航迹按currentFrameTimeMs过滤time_ms后重绘；销毁时destroy Viewer
+CesiumViewer.vue[AU8S]: F:封装Cesium地球并按props绘制点位与多机航迹折线 | R:code:web/src/stores/situation.js | A:points/tracks/track与currentFrameTimeMs驱动Entity | S:有situation tracks时优先多折线；任务track仍按帧时间截断；销毁时destroy Viewer
 
 ===/Users/yolo/project/VueProject/2026/platform2/web/src/modules/taskTrack/components/===
 TimelineOverviewBar.vue[AU5T]: F:展示时间轴可视窗口并点击跳转 | R:code:web/src/modules/taskTrack/components/VisMissionTimeline.vue | A:emit seek | S:-
@@ -99,7 +108,7 @@ index.js[EU7T]: F:定义登录、主态势与管理页路由及鉴权守卫 | R:
 
 ===/Users/yolo/project/VueProject/2026/platform2/web/src/stores/===
 aiChat.js[AD7S]: F:管理对话会话、SSE解析与中止 | R:code:web/src/api/http.js | A:send/stop/clear | S:按\n\n拆SSE块解析data行JSON
-situation.js[AD8S]: F:管理实时/查询模式与飞机点位图层状态 | R:code:web/src/api/http.js | A:query进入查询并stopRealtime | S:查询成功必须停止5s轮询；resumeRealtime才恢复
+situation.js[AD8S]: F:管理实时/查询模式、最新点/全量点与多机航迹状态 | R:code:web/src/api/http.js | A:queryLatestPoints/showDetectionTracks/showAllDetectionPoints | S:时间按本地naive字符串不上Z；任一查询入口都stopRealtime
 taskTrack.js[AD8S]: F:管理任务列表、帧索引与航迹数据 | R:code:web/src/api/http.js | A:selectTask并行拉timeline与track | S:currentFrame被钳制在帧数组范围内
 
 ===/Users/yolo/project/VueProject/2026/platform2/web/src/styles/===
@@ -109,10 +118,10 @@ tokens.css[FU6T]: F:定义面板与地图深色主题CSS变量 | R:- | A:--panel
 AdminDifyView.vue[AU6M]: F:管理员按步骤注册Dify应用并强制关键字与API Key | R:code:web/src/api/http.js | A:调用/api/v1/admin/dify；链到本机Dify控制台 | S:新建必须有app-密钥；403提示改用admin
 AdminLogsView.vue[AU5T]: F:展示AI工具调用日志表格 | R:code:web/src/api/http.js | A:GET /api/v1/ai/tool-calls | S:-
 LoginView.vue[EU6T]: F:账号密码登录并写入JWT与角色后跳转主页 | R:code:web/src/api/http.js | A:POST /api/v1/auth/login | S:默认预填operator；一键可填admin/admin
-SituationMainView.vue[AU8M]: F:三维态势主页面组装地球、查询、时间轴、对话与任务抽屉 | R:code:web/src/modules/cesiumRender/CesiumViewer.vue,code:web/src/modules/taskTrack/components/VisMissionTimeline.vue,code:web/src/stores/situation.js | A:仅管理员可见Dify管理与日志入口 | S:对话answer的aircraft_situation会停实时并写points
+SituationMainView.vue[AU8M]: F:三维态势主页面组装地球、三按钮查询、时间轴、对话与任务抽屉 | R:code:web/src/modules/cesiumRender/CesiumViewer.vue,code:web/src/stores/situation.js,code:web/src/modules/taskTrack/components/VisMissionTimeline.vue | A:查询/显示检测点航迹/显示检测点三入口 | S:进入查询模式后暂停实时；对话aircraft_situation会停实时并写points
 
 ===/Users/yolo/project/VueProject/2026/platform2/scripts/===
-start-ai-stack.sh[OW6T]: F:拉起local-llm与Harness桥，可选本地Dify桩 | R:code:services/local_llm/app.py,code:services/harness_bridge/app.py,code:scripts/start-dify.sh | A:默认18080与3080；PLATFORM2_START_DIFY_LOCAL=1才占5001 | S:官方Dify在5001时勿开本地桩，否则端口冲突
+start-ai-stack.sh[OW6T]: F:拉起local-llm与Harness桥，可选本地Dify桩 | R:code:services/local_llm/app.py,code:services/harness_bridge/app.py,code:start.sh | A:默认18080与3081；PLATFORM2_START_DIFY_LOCAL=1才占5001 | S:官方Dify在5001时勿开本地桩，否则端口冲突
 dsh[OE6T]: F:在vendored deepseek-harness内执行pnpm dsh | R:code:README.md | A:./scripts/dsh与~/.local/bin/dsh | S:默认DSH_HOME为仓库.dsh-home，可用环境变量覆盖；缺harness树则非零退出
 start-dify.sh[OV5T]: F:在dify/docker用Docker Compose拉起官方Dify | R:code:README.md | A:./scripts/start-dify.sh | S:优先把Docker.app/bin加入PATH；缺docker则非零退出
 dify-mcp[OE6T]: F:用server虚拟环境启动Dify关键字路由MCP | R:code:services/dify_mcp/server.py | A:dsh的stdio MCP命令 | S:缺server/.venv则非零退出；密钥与地址可用环境变量覆盖
@@ -121,7 +130,7 @@ dify-mcp[OE6T]: F:用server虚拟环境启动Dify关键字路由MCP | R:code:ser
 app.py[IB7S]: F:本机实现Dify Workflow运行接口并回调平台业务数据 | R:code:server/app/api/v1/internal.py | A:POST /v1/workflows/run | S:仅接受app-situation-query与app-task-list；结果放在outputs.answer与business_payload
 
 ===/Users/yolo/project/VueProject/2026/platform2/services/harness_bridge/===
-app.py[IA8M]: F:将对话转成SSE并调用Dify，LLM按DeepSeek再local顺序 | R:code:services/dify_local/app.py,code:services/local_llm/app.py | A:GET /v1/chat/stream | S:密钥依次读DSH_HOME、仓库.dsh-home、~/.dsh；官方402或失败改打本地18080
+app.py[IA8M]: F:将对话转成SSE：关键字命中调Dify，否则走LLM | R:code:services/dify_mcp/server.py,code:server/app/api/v1/internal.py | A:GET /v1/chat/stream并尽量补齐business_payload | S:关键字匹配含前导动词容错；密钥依次读DSH_HOME、仓库.dsh-home、~/.dsh
 
 ===/Users/yolo/project/VueProject/2026/platform2/services/===
 requirements.txt[FV4T]: F:锁定本机Dify与Harness桥的Python依赖 | R:code:services/dify_local/app.py | A:fastapi/uvicorn/httpx/pydantic | S:-
@@ -130,4 +139,8 @@ requirements.txt[FV4T]: F:锁定本机Dify与Harness桥的Python依赖 | R:code:
 app.py[IA6S]: F:提供OpenAI兼容本地智能体作为DeepSeek兜底 | R:code:services/harness_bridge/app.py | A:POST /v1/chat/completions | S:识别路由JSON提示时只返回app_id；普通闲聊给平台能力说明
 
 ===/Users/yolo/project/VueProject/2026/platform2/services/dify_mcp/===
-server.py[IA7M]: F:按关键字把用户原话路由到已登记Dify应用 | R:code:server/app/api/v1/internal.py | A:stdio MCP工具route_dify_message与list_dify_agents | S:Agent走/v1/chat-messages，Workflow走/v1/workflows/run；无API Key则只返回说明
+server.py[IA7M]: F:按关键字把用户原话路由到已登记Dify应用 | R:code:server/app/api/v1/internal.py | A:stdio MCP工具route_dify_message与list_dify_agents | S:最长关键字优先；Agent走chat-messages、Workflow走workflows/run；无Key只返回说明
+
+===/Users/yolo/project/VueProject/2026/platform2/.cursor/hooks/===
+aoci-stop-remind.sh[XO6S]: F:对话结束时若漂移或有脏标记则强制AOCI收尾跟进 | R:code:.cursor/hooks.json,code:doc/AOCI_MAINTAIN.md | A:verify对齐则清dirty；否则followup_message要求maintain | S:仅completed且loop_count<2；无aoci则仍可凭dirty催促
+aoci-mark-dirty.sh[XO5T]: F:文件编辑后把业务路径记入.run/aoci-dirty | R:code:.cursor/hooks.json | A:afterFileEdit读file_path并追加相对路径 | S:忽略aoci*.txt与.aoci/.run/.git，避免维护写入再次打脏

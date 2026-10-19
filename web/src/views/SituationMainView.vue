@@ -19,6 +19,15 @@ const chat = useAiChatStore()
 const chatOpen = ref(true)
 const queryText = ref('我要查询实时态势信息')
 const formAircraftId = ref('')
+const queryLoading = ref(false)
+const formRange = ref([])
+
+function defaultRange() {
+  const end = new Date()
+  const start = new Date(end.getTime() - 2 * 60 * 60 * 1000)
+  return [start, end]
+}
+formRange.value = defaultRange()
 
 const currentFrameTimeMs = computed(() => {
   const frame = taskTrack.frames[taskTrack.currentFrame]
@@ -28,6 +37,16 @@ const currentFrameTimeMs = computed(() => {
 const currentImageUrl = computed(() => {
   const frame = taskTrack.frames[taskTrack.currentFrame]
   return frame?.imageUrl || ''
+})
+
+const queryHint = computed(() => {
+  const r = situation.lastResult
+  if (situation.mode !== 'query') {
+    return '①查询：每机最新点 ②显示检测点航迹：画折线 ③显示检测点：全部点。进入查询模式后暂停实时刷新。'
+  }
+  const parts = [`点 ${r.pointCount}`, `航迹 ${r.trackCount}`]
+  if (r.truncated) parts.push('已截断')
+  return parts.join(' · ')
 })
 
 onMounted(async () => {
@@ -44,11 +63,45 @@ function logout() {
   router.push('/login')
 }
 
-async function onQuery() {
-  await situation.query({
-    mode: 'realtime',
+function requireRange() {
+  const [start, end] = formRange.value || []
+  if (!start || !end) {
+    window.alert('请选择开始与结束时间')
+    return null
+  }
+  return {
+    start_time: start,
+    end_time: end,
     aircraft_id: formAircraftId.value || undefined,
-  })
+  }
+}
+
+async function runSituationAction(action) {
+  const payload = requireRange()
+  if (!payload) return
+  queryLoading.value = true
+  try {
+    await action(payload)
+  } catch (e) {
+    window.alert(e.message || '操作失败')
+  } finally {
+    queryLoading.value = false
+  }
+}
+
+/** 1) 查询：每条航迹最新点 */
+function onQuery() {
+  return runSituationAction((p) => situation.queryLatestPoints(p))
+}
+
+/** 2) 显示检测点航迹 */
+function onShowDetectionTracks() {
+  return runSituationAction((p) => situation.showDetectionTracks(p))
+}
+
+/** 3) 显示检测点：全部点 */
+function onShowAllDetectionPoints() {
+  return runSituationAction((p) => situation.showAllDetectionPoints(p))
 }
 
 async function onShowTasks() {
@@ -70,6 +123,7 @@ async function onSendChat() {
     situation.mode = 'query'
     situation.stopRealtime()
     situation.points = payload.data?.points || []
+    situation.tracks = payload.data?.tracks || situation.tracks
   }
   if (payload.type === 'task_list') {
     taskTrack.panelOpen = true
@@ -111,17 +165,54 @@ async function onSendChat() {
 
     <aside class="side-panel">
       <h3>态势查询</h3>
-      <label>飞机编号</label>
-      <el-input v-model="formAircraftId" placeholder="可选" size="small" />
-      <el-button class="mt" type="primary" style="width: 100%" size="small" @click="onQuery">
+      <label>时间范围</label>
+      <el-date-picker
+        v-model="formRange"
+        type="datetimerange"
+        size="small"
+        style="width: 100%"
+        range-separator="至"
+        start-placeholder="开始"
+        end-placeholder="结束"
+        :clearable="false"
+      />
+      <label class="mt-label">飞机编号</label>
+      <el-input v-model="formAircraftId" placeholder="可选，如 UA001" size="small" clearable />
+      <el-button
+        class="mt"
+        type="primary"
+        style="width: 100%"
+        size="small"
+        :loading="queryLoading"
+        @click="onQuery"
+      >
         查询
       </el-button>
-      <p class="hint">进入查询模式后暂停实时点位刷新。</p>
+      <el-button
+        class="mt"
+        style="width: 100%"
+        size="small"
+        :loading="queryLoading"
+        @click="onShowDetectionTracks"
+      >
+        显示检测点航迹
+      </el-button>
+      <el-button
+        class="mt"
+        style="width: 100%"
+        size="small"
+        :loading="queryLoading"
+        @click="onShowAllDetectionPoints"
+      >
+        显示检测点
+      </el-button>
+      <p class="hint">{{ queryHint }}</p>
     </aside>
 
     <main class="map-area">
       <CesiumViewer
         :points="situation.points"
+        :tracks="situation.tracks"
         :track="taskTrack.track"
         :current-frame-time-ms="currentFrameTimeMs"
         :show-points="situation.layers.points"
@@ -247,7 +338,11 @@ async function onSendChat() {
 }
 
 .mt { margin-top: 10px; }
-.hint { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.mt-label { display: block; margin-top: 10px; margin-bottom: 4px; font-size: 12px; }
+.query-split { display: flex; gap: 8px; }
+.query-split .el-button { flex: 1; }
+.hint { color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+.side-panel label { display: block; margin-bottom: 4px; font-size: 12px; }
 .chat-log { height: 46%; overflow: auto; margin-bottom: 10px; font-size: 13px; }
 .msg { margin-bottom: 8px; }
 .msg.user { color: var(--accent); }
