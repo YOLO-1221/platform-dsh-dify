@@ -7,8 +7,16 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db import get_db
-from app.models import SitAircraftPoint, SitTaskImage, SitTaskInfo, SitTrack, User
+from app.models import SitAircraftPoint, SitTaskInfo, SitTrack, User
 from app.services.situation_query import build_points_response, build_tracks_response
+from app.services.task_workflow import (
+    associated_situation,
+    detection_images,
+    detection_points,
+    detection_tracks,
+    open_task,
+    timeline_frames,
+)
 
 router = APIRouter(prefix="/situation", tags=["situation"])
 
@@ -91,35 +99,40 @@ def task_list(db: Session = Depends(get_db), _: User = Depends(get_current_user)
     }
 
 
+@router.get("/task/{task_id}", operation_id="open_detection_task")
+def task_open(task_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """打开检测任务：只返回任务与各图层数量，不加载标绘数据。"""
+    return open_task(db, task_id)
+
+
+@router.get("/task/{task_id}/detections", operation_id="get_task_detection_points")
+def task_detections(task_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """加载该任务图像检测点。"""
+    return detection_points(db, task_id)
+
+
+@router.get("/task/{task_id}/tracks", operation_id="get_task_detection_tracks")
+def task_detection_tracks(task_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """加载该任务全部检测航迹。"""
+    return detection_tracks(db, task_id)
+
+
+@router.get("/task/{task_id}/images", operation_id="get_task_detection_images")
+def task_images(task_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """加载该任务检测图像与时间轴帧。"""
+    return detection_images(db, task_id)
+
+
+@router.get("/task/{task_id}/associated-situation", operation_id="get_task_associated_situation")
+def task_associated_situation(task_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """加载与任务时段、检测足迹重叠的态势点。"""
+    return associated_situation(db, task_id)
+
+
 @router.get("/task/{task_id}/timeline", operation_id="get_task_timeline")
 def task_timeline(task_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """获取检测任务时间轴帧。"""
-    images = (
-        db.query(SitTaskImage)
-        .filter(SitTaskImage.task_id == task_id)
-        .order_by(SitTaskImage.received_at.asc())
-        .all()
-    )
-    buckets: dict[int, list] = {}
-    for img in images:
-        key = int(img.received_at.timestamp())
-        buckets.setdefault(key, []).append(img)
-
-    frames = []
-    for index, key in enumerate(sorted(buckets.keys())):
-        group = buckets[key]
-        first = group[0]
-        frames.append(
-            {
-                "index": index,
-                "timeMs": int(first.received_at.timestamp() * 1000),
-                "reconTime": first.received_at.isoformat(),
-                "imageCount": len(group),
-                "imageUrl": first.image_url,
-                "imageIds": [g.id for g in group],
-            }
-        )
-    return {"frames": frames}
+    return timeline_frames(db, task_id)
 
 
 @router.get("/task/{task_id}/track", operation_id="get_task_track")

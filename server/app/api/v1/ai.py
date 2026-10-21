@@ -152,11 +152,22 @@ def _capture_answer(chunk: str) -> str:
     return ""
 
 
-async def _harness_sse(db: Session, session_id: str, query: str):
+async def _harness_sse(
+    db: Session,
+    session_id: str,
+    query: str,
+    task_id: str | None = None,
+    done: str | None = None,
+):
     url = f"{settings.harness_base_url.rstrip('/')}/v1/chat/stream"
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=120.0)) as client:
-            async with client.stream("GET", url, params={"session_id": session_id, "q": query}) as resp:
+            params = {"session_id": session_id, "q": query}
+            if task_id:
+                params["task_id"] = task_id
+            if done:
+                params["done"] = done
+            async with client.stream("GET", url, params=params) as resp:
                 if resp.status_code >= 400:
                     body = (await resp.aread()).decode("utf-8", errors="replace")
                     yield _sse(
@@ -197,6 +208,8 @@ async def _harness_sse(db: Session, session_id: str, query: str):
 async def chat_stream(
     session_id: str = Query(...),
     q: str = Query(...),
+    task_id: str | None = Query(default=None),
+    done: str | None = Query(default=None, description="前端已完成行为 id，逗号分隔"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -210,7 +223,7 @@ async def chat_stream(
                 answer_text = _capture_answer(chunk) or answer_text
                 yield chunk
         else:
-            async for chunk in _harness_sse(db, session_id, q):
+            async for chunk in _harness_sse(db, session_id, q, task_id, done):
                 answer_text = _capture_answer(chunk) or answer_text
                 yield chunk
         db.add(AiChatMessage(session_id=session_id, role="assistant", content=answer_text or "stream-completed"))

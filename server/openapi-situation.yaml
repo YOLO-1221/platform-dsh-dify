@@ -117,7 +117,87 @@ paths:
                     items:
                       $ref: "#/components/schemas/TaskItem"
 
+  /api/v1/internal/situation/task/{task_id}:
+    get:
+      operationId: internal_open_detection_task
+      summary: 打开检测任务
+      description: 返回任务元数据及检测点、航迹、图像数量，不返回标绘数据。
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: 任务不存在
+
+  /api/v1/internal/situation/task/{task_id}/detections:
+    get:
+      operationId: internal_get_task_detection_points
+      summary: 加载任务检测点
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: OK
+
+  /api/v1/internal/situation/task/{task_id}/tracks:
+    get:
+      operationId: internal_get_task_detection_tracks
+      summary: 加载任务检测航迹
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: OK
+
+  /api/v1/internal/situation/task/{task_id}/images:
+    get:
+      operationId: internal_get_task_detection_images
+      summary: 加载任务检测图像
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: OK
+
+  /api/v1/internal/situation/task/{task_id}/associated-situation:
+    get:
+      operationId: internal_get_task_associated_situation
+      summary: 加载时空关联态势点
+      description: 返回任务起止时间内、且落在检测点外扩范围内的态势观测点。
+      tags: [situation]
+      security:
+        - ServiceToken: []
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: OK
+
 components:
+  parameters:
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        type: string
   securitySchemes:
     ServiceToken:
       type: http

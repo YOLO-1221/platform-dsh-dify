@@ -10,6 +10,13 @@ from app.core.config import settings
 from app.db import get_db
 from app.models import DifyAgentRegistry, SitAircraftPoint, SitTaskInfo
 from app.services.situation_query import build_points_response, build_tracks_response
+from app.services.task_workflow import (
+    associated_situation,
+    detection_images,
+    detection_points,
+    detection_tracks,
+    open_task,
+)
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -115,3 +122,36 @@ def tasks(_: None = Depends(require_service), db: Session = Depends(get_db)):
             for t in rows
         ]
     }
+
+
+@router.get("/situation/task/{task_id}", operation_id="internal_open_detection_task")
+def task_open(task_id: str, _: None = Depends(require_service), db: Session = Depends(get_db)):
+    """服务令牌：打开检测任务（元数据与图层数量）。"""
+    return open_task(db, task_id)
+
+
+@router.get("/situation/task/{task_id}/detections", operation_id="internal_get_task_detection_points")
+def task_detections(task_id: str, _: None = Depends(require_service), db: Session = Depends(get_db)):
+    """服务令牌：任务检测点。"""
+    return detection_points(db, task_id)
+
+
+@router.get("/situation/task/{task_id}/tracks", operation_id="internal_get_task_detection_tracks")
+def task_detection_tracks(task_id: str, _: None = Depends(require_service), db: Session = Depends(get_db)):
+    """服务令牌：任务检测航迹。"""
+    return detection_tracks(db, task_id)
+
+
+@router.get("/situation/task/{task_id}/images", operation_id="internal_get_task_detection_images")
+def task_images(task_id: str, _: None = Depends(require_service), db: Session = Depends(get_db)):
+    """服务令牌：任务检测图像。"""
+    return detection_images(db, task_id)
+
+
+@router.get(
+    "/situation/task/{task_id}/associated-situation",
+    operation_id="internal_get_task_associated_situation",
+)
+def task_associated(task_id: str, _: None = Depends(require_service), db: Session = Depends(get_db)):
+    """服务令牌：与任务时空重叠的态势点。"""
+    return associated_situation(db, task_id)

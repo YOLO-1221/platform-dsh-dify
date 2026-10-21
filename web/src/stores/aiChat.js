@@ -7,6 +7,7 @@ export const useAiChatStore = defineStore('aiChat', () => {
   const messages = ref([])
   const events = ref([])
   const streaming = ref(false)
+  const lastBusinessPayload = ref(null)
   let abortController = null
 
   async function ensureSession() {
@@ -16,14 +17,28 @@ export const useAiChatStore = defineStore('aiChat', () => {
     return sessionId.value
   }
 
-  async function send(text) {
+  /**
+   * @param {string} text
+   * @param {{ taskId?: string|null, done?: string[] }} [opts]
+   */
+  async function send(text, opts = {}) {
+    const taskId = typeof opts === 'string' || opts == null ? opts : opts.taskId
+    const done = Array.isArray(opts?.done) ? opts.done : []
+
     await ensureSession()
     messages.value.push({ role: 'user', content: text })
     streaming.value = true
     events.value = []
+    lastBusinessPayload.value = null
     abortController = new AbortController()
 
-    const url = `/api/v1/ai/chat/stream?session_id=${encodeURIComponent(sessionId.value)}&q=${encodeURIComponent(text)}`
+    const params = new URLSearchParams({
+      session_id: sessionId.value,
+      q: text,
+    })
+    if (taskId) params.set('task_id', taskId)
+    if (done.length) params.set('done', done.join(','))
+    const url = `/api/v1/ai/chat/stream?${params.toString()}`
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${getToken()}` },
       signal: abortController.signal,
@@ -39,8 +54,8 @@ export const useAiChatStore = defineStore('aiChat', () => {
     let answer = ''
 
     while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+      const { done: streamDone, value } = await reader.read()
+      if (streamDone) break
       buffer += decoder.decode(value, { stream: true })
       const chunks = buffer.split('\n\n')
       buffer = chunks.pop() || ''
@@ -52,7 +67,7 @@ export const useAiChatStore = defineStore('aiChat', () => {
         if (payload.event_type === 'answer') {
           answer = payload.content || answer
           if (payload.business_payload) {
-            // consumers (situation/task modules) listen via returned payload
+            lastBusinessPayload.value = payload.business_payload
             messages.value.push({
               role: 'assistant',
               content: answer,
@@ -67,7 +82,7 @@ export const useAiChatStore = defineStore('aiChat', () => {
       messages.value.push({ role: 'assistant', content: answer })
     }
     streaming.value = false
-    return { answer, events: events.value }
+    return { answer, events: events.value, business_payload: lastBusinessPayload.value }
   }
 
   function stop() {
@@ -78,7 +93,18 @@ export const useAiChatStore = defineStore('aiChat', () => {
   function clear() {
     messages.value = []
     events.value = []
+    lastBusinessPayload.value = null
   }
 
-  return { sessionId, messages, events, streaming, ensureSession, send, stop, clear }
+  return {
+    sessionId,
+    messages,
+    events,
+    streaming,
+    lastBusinessPayload,
+    ensureSession,
+    send,
+    stop,
+    clear,
+  }
 })

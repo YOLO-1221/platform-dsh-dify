@@ -7,6 +7,8 @@ import { isAdmin, setToken } from '@/api/http'
 import { useSituationStore } from '@/stores/situation'
 import { useTaskTrackStore } from '@/stores/taskTrack'
 import { useAiChatStore } from '@/stores/aiChat'
+import { collectDoneIds, defaultNextActions } from '@/modules/taskTrack/actionCatalog'
+import { applyBusinessPayload as applyWorkflowPayload } from '@/modules/taskTrack/workflowActions'
 
 const router = useRouter()
 const route = useRoute()
@@ -17,17 +19,18 @@ const taskTrack = useTaskTrackStore()
 const chat = useAiChatStore()
 
 const chatOpen = ref(true)
-const queryText = ref('我要查询实时态势信息')
-const formAircraftId = ref('')
-const queryLoading = ref(false)
-const formRange = ref([])
+const queryText = ref('查询当前检测任务')
+const actionLoading = ref('')
+/** 对话推荐的下一步：{ id, label, utterance }[] */
+const suggestedActions = ref([])
 
-function defaultRange() {
-  const end = new Date()
-  const start = new Date(end.getTime() - 2 * 60 * 60 * 1000)
-  return [start, end]
+function currentDoneIds() {
+  return collectDoneIds(taskTrack.workflowSnapshot())
 }
-formRange.value = defaultRange()
+
+function refreshLocalSuggestions(type) {
+  suggestedActions.value = defaultNextActions(type, currentDoneIds())
+}
 
 const currentFrameTimeMs = computed(() => {
   const frame = taskTrack.frames[taskTrack.currentFrame]
@@ -39,14 +42,32 @@ const currentImageUrl = computed(() => {
   return frame?.imageUrl || ''
 })
 
-const queryHint = computed(() => {
-  const r = situation.lastResult
-  if (situation.mode !== 'query') {
-    return '①查询：每机最新点 ②显示检测点航迹：画折线 ③显示检测点：全部点。进入查询模式后暂停实时刷新。'
+const plotPoints = computed(() => {
+  if (situation.mode === 'realtime') return situation.points
+  return [...taskTrack.detectionPoints, ...taskTrack.associatedPoints]
+})
+
+const plotTracks = computed(() => {
+  if (situation.mode === 'realtime') return situation.tracks
+  const limit = currentFrameTimeMs.value
+  return taskTrack.detectionTracks.map((tr) => ({
+    ...tr,
+    points: limit == null ? tr.points : (tr.points || []).filter((p) => (p.time_ms ?? 0) <= limit),
+  }))
+})
+
+const workflowHint = computed(() => {
+  if (!taskTrack.selectedTask) {
+    return '①查询任务 ②打开任务，再按需加载检测点、检测航迹、检测图像和时空关联态势点。'
   }
-  const parts = [`点 ${r.pointCount}`, `航迹 ${r.trackCount}`]
-  if (r.truncated) parts.push('已截断')
-  return parts.join(' · ')
+  const name = taskTrack.selectedTask.name
+  return [
+    name,
+    `检测点 ${taskTrack.detectionPoints.length}`,
+    `航迹 ${taskTrack.detectionTracks.length}`,
+    `图像 ${taskTrack.images.length}`,
+    `关联态势 ${taskTrack.associatedPoints.length}`,
+  ].join(' · ')
 })
 
 onMounted(async () => {
@@ -54,81 +75,113 @@ onMounted(async () => {
     window.alert('Dify 注册与日志仅管理员可用，请使用 admin/admin 重新登录。')
     router.replace({ path: '/', query: {} })
   }
-  situation.startRealtime()
   await taskTrack.loadTasks()
 })
+
+function enterTaskMode() {
+  situation.mode = 'query'
+  situation.stopRealtime()
+}
 
 function logout() {
   setToken('')
   router.push('/login')
 }
 
-function requireRange() {
-  const [start, end] = formRange.value || []
-  if (!start || !end) {
-    window.alert('请选择开始与结束时间')
-    return null
-  }
-  return {
-    start_time: start,
-    end_time: end,
-    aircraft_id: formAircraftId.value || undefined,
-  }
-}
-
-async function runSituationAction(action) {
-  const payload = requireRange()
-  if (!payload) return
-  queryLoading.value = true
+async function runWorkflow(name, action) {
+  actionLoading.value = name
   try {
-    await action(payload)
+    await action()
   } catch (e) {
     window.alert(e.message || '操作失败')
   } finally {
-    queryLoading.value = false
+    actionLoading.value = ''
   }
 }
 
-/** 1) 查询：每条航迹最新点 */
-function onQuery() {
-  return runSituationAction((p) => situation.queryLatestPoints(p))
+function onQueryTasks() {
+  return runWorkflow('tasks', async () => {
+    await taskTrack.queryTasks()
+    refreshLocalSuggestions('task_list')
+  })
 }
 
-/** 2) 显示检测点航迹 */
-function onShowDetectionTracks() {
-  return runSituationAction((p) => situation.showDetectionTracks(p))
+function onOpenTask(taskId) {
+  return runWorkflow('open', async () => {
+    enterTaskMode()
+    await taskTrack.openTask(taskId)
+    refreshLocalSuggestions('task_open')
+  })
 }
 
-/** 3) 显示检测点：全部点 */
-function onShowAllDetectionPoints() {
-  return runSituationAction((p) => situation.showAllDetectionPoints(p))
+function onLoadDetections() {
+  return runWorkflow('detections', async () => {
+    enterTaskMode()
+    await taskTrack.loadDetectionPoints()
+    refreshLocalSuggestions('detection_points')
+  })
 }
 
-async function onShowTasks() {
-  taskTrack.panelOpen = true
-  await taskTrack.loadTasks()
+function onLoadTracks() {
+  return runWorkflow('tracks', async () => {
+    enterTaskMode()
+    await taskTrack.loadDetectionTracks()
+    refreshLocalSuggestions('detection_tracks')
+  })
 }
 
-async function onSelectTask(taskId) {
-  await taskTrack.selectTask(taskId)
+function onLoadImages() {
+  return runWorkflow('images', async () => {
+    enterTaskMode()
+    await taskTrack.loadImages()
+    refreshLocalSuggestions('detection_images')
+  })
 }
 
-async function onSendChat() {
-  if (!queryText.value.trim()) return
-  const { events } = await chat.send(queryText.value.trim())
-  const answer = [...events].reverse().find((e) => e.event_type === 'answer')
-  const payload = answer?.business_payload
-  if (!payload) return
-  if (payload.type === 'aircraft_situation') {
-    situation.mode = 'query'
-    situation.stopRealtime()
-    situation.points = payload.data?.points || []
-    situation.tracks = payload.data?.tracks || situation.tracks
-  }
-  if (payload.type === 'task_list') {
-    taskTrack.panelOpen = true
-    taskTrack.tasks = payload.data?.tasks || []
-  }
+function onLoadAssociated() {
+  return runWorkflow('associated', async () => {
+    enterTaskMode()
+    await taskTrack.loadAssociatedSituation()
+    refreshLocalSuggestions('associated_situation')
+  })
+}
+
+function onClearPlot() {
+  situation.clearPlot()
+  taskTrack.clearLayers()
+  suggestedActions.value = []
+}
+
+function applyBusinessPayload(payload) {
+  const result = applyWorkflowPayload(payload, {
+    taskTrack,
+    enterTaskMode,
+    doneIds: currentDoneIds, // hydrate 后再采样，过滤已完成步骤
+  })
+  if (result) suggestedActions.value = result.nextActions
+}
+
+async function onSendChat(text) {
+  const content = (typeof text === 'string' ? text : queryText.value).trim()
+  if (!content) return
+  queryText.value = content
+  suggestedActions.value = []
+  const done = currentDoneIds()
+  const { business_payload } = await chat.send(content, {
+    taskId: taskTrack.selectedTaskId,
+    done,
+  })
+  applyBusinessPayload(business_payload)
+}
+
+function onSuggestedAction(action) {
+  if (!action?.utterance || chat.streaming) return
+  return onSendChat(action.utterance)
+}
+
+function onClearChat() {
+  chat.clear()
+  suggestedActions.value = []
 }
 </script>
 
@@ -147,8 +200,8 @@ async function onSendChat() {
         <el-button size="small" @click="situation.layers.tracks = !situation.layers.tracks">
           航迹 {{ situation.layers.tracks ? '开' : '关' }}
         </el-button>
-        <el-button size="small" @click="situation.clearPlot()">清空标绘</el-button>
-        <el-button size="small" type="primary" @click="onShowTasks">任务列表</el-button>
+        <el-button size="small" @click="onClearPlot">清空标绘</el-button>
+        <el-button size="small" type="primary" @click="onQueryTasks">查询任务</el-button>
         <el-button size="small" @click="chatOpen = !chatOpen">对话</el-button>
         <el-button v-if="admin" size="small" text @click="router.push('/admin/dify')">
           Dify管理
@@ -164,56 +217,66 @@ async function onSendChat() {
     </header>
 
     <aside class="side-panel">
-      <h3>态势查询</h3>
-      <label>时间范围</label>
-      <el-date-picker
-        v-model="formRange"
-        type="datetimerange"
-        size="small"
-        style="width: 100%"
-        range-separator="至"
-        start-placeholder="开始"
-        end-placeholder="结束"
-        :clearable="false"
-      />
-      <label class="mt-label">飞机编号</label>
-      <el-input v-model="formAircraftId" placeholder="可选，如 UA001" size="small" clearable />
+      <h3>作业流程</h3>
       <el-button
-        class="mt"
         type="primary"
         style="width: 100%"
         size="small"
-        :loading="queryLoading"
-        @click="onQuery"
+        :loading="actionLoading === 'tasks'"
+        @click="onQueryTasks"
       >
-        查询
+        1. 查询任务
+      </el-button>
+      <p class="step-status">
+        2. 打开任务：{{ taskTrack.selectedTask?.name || '未打开' }}
+      </p>
+      <el-button
+        class="mt"
+        style="width: 100%"
+        size="small"
+        :disabled="!taskTrack.selectedTaskId"
+        :loading="actionLoading === 'detections'"
+        @click="onLoadDetections"
+      >
+        3. 加载检测点
       </el-button>
       <el-button
         class="mt"
         style="width: 100%"
         size="small"
-        :loading="queryLoading"
-        @click="onShowDetectionTracks"
+        :disabled="!taskTrack.selectedTaskId"
+        :loading="actionLoading === 'tracks'"
+        @click="onLoadTracks"
       >
-        显示检测点航迹
+        4. 加载检测航迹
       </el-button>
       <el-button
         class="mt"
         style="width: 100%"
         size="small"
-        :loading="queryLoading"
-        @click="onShowAllDetectionPoints"
+        :disabled="!taskTrack.selectedTaskId"
+        :loading="actionLoading === 'images'"
+        @click="onLoadImages"
       >
-        显示检测点
+        5. 加载检测图像
       </el-button>
-      <p class="hint">{{ queryHint }}</p>
+      <el-button
+        class="mt"
+        style="width: 100%"
+        size="small"
+        :disabled="!taskTrack.selectedTaskId"
+        :loading="actionLoading === 'associated'"
+        @click="onLoadAssociated"
+      >
+        6. 加载时空关联态势点
+      </el-button>
+      <p class="hint">{{ workflowHint }}</p>
     </aside>
 
     <main class="map-area">
       <CesiumViewer
-        :points="situation.points"
-        :tracks="situation.tracks"
-        :track="taskTrack.track"
+        :points="plotPoints"
+        :tracks="plotTracks"
         :current-frame-time-ms="currentFrameTimeMs"
         :show-points="situation.layers.points"
         :show-tracks="situation.layers.tracks"
@@ -244,22 +307,36 @@ async function onSendChat() {
           [{{ e.event_type }}] {{ e.content || e.tool_name || '' }}
         </div>
       </div>
+      <div v-if="suggestedActions.length" class="suggested">
+        <div class="suggested-title">推荐下一步</div>
+        <div class="suggested-list">
+          <el-button
+            v-for="a in suggestedActions"
+            :key="a.id"
+            size="small"
+            :disabled="chat.streaming"
+            @click="onSuggestedAction(a)"
+          >
+            {{ a.label }}
+          </el-button>
+        </div>
+      </div>
       <el-input v-model="queryText" type="textarea" :rows="3" />
       <div class="mt toolbar-actions">
-        <el-button type="primary" size="small" :loading="chat.streaming" @click="onSendChat">发送</el-button>
+        <el-button type="primary" size="small" :loading="chat.streaming" @click="onSendChat()">发送</el-button>
         <el-button size="small" @click="chat.stop()">停止</el-button>
-        <el-button size="small" @click="chat.clear()">清空</el-button>
+        <el-button size="small" @click="onClearChat">清空</el-button>
       </div>
     </aside>
 
-    <el-drawer v-model="taskTrack.panelOpen" title="任务列表" size="360px" direction="rtl">
+    <el-drawer v-model="taskTrack.panelOpen" title="打开任务" size="360px" direction="rtl">
       <div class="task-drawer">
         <div
           v-for="t in taskTrack.tasks"
           :key="t.id"
           class="task-item"
           :class="{ active: t.id === taskTrack.selectedTaskId }"
-          @click="onSelectTask(t.id)"
+          @click="onOpenTask(t.id)"
         >
           <div>{{ t.name }}</div>
           <small>{{ t.status }} · {{ t.start_time }}</small>
@@ -342,6 +419,10 @@ async function onSendChat() {
 .query-split { display: flex; gap: 8px; }
 .query-split .el-button { flex: 1; }
 .hint { color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+.step-status { margin: 10px 0 0; font-size: 13px; }
+.suggested { margin-bottom: 10px; }
+.suggested-title { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.suggested-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .side-panel label { display: block; margin-bottom: 4px; font-size: 12px; }
 .chat-log { height: 46%; overflow: auto; margin-bottom: 10px; font-size: 13px; }
 .msg { margin-bottom: 8px; }

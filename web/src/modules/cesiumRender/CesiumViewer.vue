@@ -107,12 +107,25 @@ function isLatestPerAircraft(points) {
   return true
 }
 
+function pointStyle(p) {
+  const detection = p?.kind === 'detection'
+  return {
+    color: Cesium.Color.fromCssColorString(detection ? '#f59e0b' : POINT_COLOR),
+    pixelSize: detection ? 12 : 10,
+  }
+}
+
 function upsertPoint(key, p, labelText) {
   if (!key || !viewer) return
   const position = toCartesian(p)
+  const style = pointStyle(p)
   const existing = pointById.get(key)
   if (existing) {
     existing.position = position
+    if (existing.point) {
+      existing.point.color = style.color
+      existing.point.pixelSize = style.pixelSize
+    }
     if (existing.label) existing.label.text = labelText || ''
     existing.show = props.showPoints
     return existing
@@ -121,8 +134,8 @@ function upsertPoint(key, p, labelText) {
     id: `pt:${key}`,
     position,
     point: {
-      pixelSize: 10,
-      color: Cesium.Color.fromCssColorString(POINT_COLOR),
+      pixelSize: style.pixelSize,
+      color: style.color,
       outlineColor: Cesium.Color.WHITE,
       outlineWidth: 1,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,

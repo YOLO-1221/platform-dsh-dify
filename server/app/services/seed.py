@@ -58,64 +58,8 @@ def ensure_seed_data():
 
         # 演示态势点：始终刷新 UA00x，保证「最近 N 小时」时间窗可查可连航迹
         _seed_situation_aircraft_points(db)
-
-        if not db.query(SitTaskInfo).first():
-            start = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
-            end = start + timedelta(minutes=40)
-            task_id = "task-demo-1"
-            db.add(
-                SitTaskInfo(
-                    id=task_id,
-                    name="演示检测任务-1",
-                    status="running",
-                    start_time=start,
-                    end_time=end,
-                )
-            )
-            db.flush()
-
-            track_points = []
-            for i in range(12):
-                t = start + timedelta(minutes=i * 3)
-                image_id = f"img-{i+1:02d}"
-                lon = 116.35 + i * 0.02
-                lat = 39.85 + i * 0.01
-                db.add(
-                    SitTaskImage(
-                        id=image_id,
-                        task_id=task_id,
-                        received_at=t,
-                        image_url=f"https://picsum.photos/seed/platform2-{i}/640/360",
-                    )
-                )
-                db.flush()
-                db.add(
-                    SitImageDetectionResult(
-                        image_id=image_id,
-                        aircraft_id="DET-A1",
-                        lon=lon,
-                        lat=lat,
-                        alt=8200,
-                        confidence=0.92,
-                    )
-                )
-                track_points.append(
-                    {
-                        "time_ms": int(t.timestamp() * 1000),
-                        "lon": lon,
-                        "lat": lat,
-                        "alt": 8200,
-                    }
-                )
-
-            db.add(
-                SitTrack(
-                    id="track-demo-1",
-                    task_id=task_id,
-                    aircraft_id="DET-A1",
-                    points_json=json.dumps(track_points),
-                )
-            )
+        # 演示检测任务与 UA001 近时足迹重叠，便于「时空关联态势点」
+        _seed_demo_detection_task(db)
 
         keyword_defaults = {
             "situation-query": "态势,飞机,点位,空域",
@@ -163,3 +107,88 @@ def _seed_situation_aircraft_points(db):
                     observed_at=now - timedelta(minutes=age),
                 )
             )
+
+
+DEMO_TASK_ID = "task-demo-1"
+
+
+def _seed_demo_detection_task(db):
+    """Rewrite the demo detection task so it stays inside the current situation window."""
+    image_ids = [
+        row[0]
+        for row in db.query(SitTaskImage.id).filter(SitTaskImage.task_id == DEMO_TASK_ID).all()
+    ]
+    if image_ids:
+        db.query(SitImageDetectionResult).filter(
+            SitImageDetectionResult.image_id.in_(image_ids)
+        ).delete(synchronize_session=False)
+    db.query(SitTaskImage).filter(SitTaskImage.task_id == DEMO_TASK_ID).delete(synchronize_session=False)
+    db.query(SitTrack).filter(SitTrack.task_id == DEMO_TASK_ID).delete(synchronize_session=False)
+    existing = db.get(SitTaskInfo, DEMO_TASK_ID)
+    if existing is not None:
+        db.delete(existing)
+    db.flush()
+
+    now = datetime.now().replace(second=0, microsecond=0)
+    # 8 frames, 5 min apart, ending now — overlaps the newest UA001 samples
+    start = now - timedelta(minutes=35)
+    db.add(
+        SitTaskInfo(
+            id=DEMO_TASK_ID,
+            name="演示检测任务-1",
+            status="running",
+            start_time=start,
+            end_time=now,
+        )
+    )
+    db.flush()
+
+    tracks: dict[str, list] = {"DET-A1": [], "DET-B2": []}
+    for i, step in enumerate(range(16, 24)):
+        observed = now - timedelta(minutes=(23 - step) * 5)
+        base_lon = 116.20 + step * 0.012
+        base_lat = 39.80 + step * 0.006
+        image_id = f"img-demo-{i + 1:02d}"
+        db.add(
+            SitTaskImage(
+                id=image_id,
+                task_id=DEMO_TASK_ID,
+                received_at=observed,
+                image_url=f"https://picsum.photos/seed/platform2-{i}/640/360",
+            )
+        )
+        db.flush()
+        samples = (
+            ("DET-A1", base_lon + 0.004, base_lat + 0.003, 8200, 0.93),
+            ("DET-B2", base_lon - 0.006, base_lat + 0.008, 7900, 0.88),
+        )
+        for aircraft_id, lon, lat, alt, confidence in samples:
+            db.add(
+                SitImageDetectionResult(
+                    image_id=image_id,
+                    aircraft_id=aircraft_id,
+                    lon=lon,
+                    lat=lat,
+                    alt=alt,
+                    confidence=confidence,
+                )
+            )
+            tracks[aircraft_id].append(
+                {
+                    "time_ms": int(observed.timestamp() * 1000),
+                    "lon": lon,
+                    "lat": lat,
+                    "alt": alt,
+                    "observed_at": observed.isoformat(),
+                }
+            )
+
+    for aircraft_id, points in tracks.items():
+        db.add(
+            SitTrack(
+                id=f"track-demo-{aircraft_id}",
+                task_id=DEMO_TASK_ID,
+                aircraft_id=aircraft_id,
+                points_json=json.dumps(points),
+            )
+        )

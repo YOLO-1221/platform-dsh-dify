@@ -213,12 +213,105 @@ async def _consume_dify_sse(resp: httpx.Response) -> str:
     return "".join(agent_chunks or message_chunks).strip()
 
 
-async def _run_dify(app: dict[str, Any], query: str) -> dict[str, Any]:
+def _strip_markdown_fence(text: str) -> str:
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if not lines:
+        return stripped
+    # drop opening ``` or ```json
+    lines = lines[1:]
+    while lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def _candidate_json_blobs(text: str) -> list[str]:
+    """Collect likely JSON object strings from an Agent reply."""
+    cleaned = _strip_markdown_fence(text)
+    blobs = [cleaned]
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start >= 0 and end > start:
+        blobs.append(cleaned[start : end + 1])
+    return blobs
+
+
+def _normalize_agent_outputs(obj: dict[str, Any], raw_text: str) -> dict[str, Any] | None:
+    payload = obj.get("business_payload")
+    if not isinstance(payload, dict) or not payload.get("type"):
+        # allow {type, data} at top level
+        if obj.get("type") and isinstance(obj.get("data"), (dict, list)):
+            payload = {"type": obj["type"], "data": obj.get("data") or {}}
+        else:
+            return None
+    answer = obj.get("answer")
+    if answer is None or str(answer).strip() == "":
+        answer = raw_text.strip() or f"已完成 {payload.get('type')}"
+    business: dict[str, Any] = {
+        "type": payload["type"],
+        "data": payload.get("data") if isinstance(payload.get("data"), dict) else {"value": payload.get("data")},
+    }
+    next_actions = payload.get("next_actions")
+    if next_actions is None:
+        next_actions = obj.get("next_actions")
+    if isinstance(next_actions, list):
+        business["next_actions"] = next_actions
+    return {"answer": str(answer), "business_payload": business}
+
+
+def parse_agent_structured_reply(text: str) -> dict[str, Any] | None:
+    """Parse Agent text into {answer, business_payload} when Skill returns JSON."""
+    if not text or not text.strip():
+        return None
+    for blob in _candidate_json_blobs(text):
+        try:
+            obj = json.loads(blob)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            normalized = _normalize_agent_outputs(obj, text)
+            if normalized is not None:
+                return normalized
+    return None
+
+
+def _compose_agent_query(query: str, task_id: str | None = None, done: str | None = None) -> str:
+    """把前端状态拼进 query，避免 Agent 未声明 inputs 时 400。"""
+    parts: list[str] = []
+    if task_id:
+        parts.append(f"task_id={task_id}")
+    if done:
+        parts.append(f"done={done}")
+    if not parts:
+        return query
+    return f"{query}\n\n[context] {'; '.join(parts)}"
+
+
+def _parse_done_ids(done: str | None) -> list[str]:
+    if not done:
+        return []
+    return [x.strip() for x in str(done).split(",") if x.strip()]
+
+
+async def _run_dify(
+    app: dict[str, Any],
+    query: str,
+    task_id: str | None = None,
+    done: str | None = None,
+) -> dict[str, Any]:
     api_key = str(app.get("api_key") or "").strip()
     if not api_key:
         raise RuntimeError(f"应用 {app.get('app_id')} 未配置 API Key")
     headers = {"Authorization": f"Bearer {api_key}"}
     app_type = str(app.get("app_type") or "workflow")
+    inputs: dict[str, Any] = {"query": query}
+    if task_id:
+        inputs["task_id"] = task_id
+    if done:
+        inputs["done"] = done
+    agent_query = _compose_agent_query(query, task_id, done)
     async with httpx.AsyncClient(timeout=120.0) as client:
         if app_type == "agent":
             async with client.stream(
@@ -227,7 +320,7 @@ async def _run_dify(app: dict[str, Any], query: str) -> dict[str, Any]:
                 headers=headers,
                 json={
                     "inputs": {},
-                    "query": query,
+                    "query": agent_query,
                     "response_mode": "streaming",
                     "user": "platform2",
                 },
@@ -236,11 +329,14 @@ async def _run_dify(app: dict[str, Any], query: str) -> dict[str, Any]:
                     body = (await resp.aread()).decode("utf-8", errors="replace")
                     raise RuntimeError(f"Dify Agent {resp.status_code}: {body[:300]}")
                 answer = await _consume_dify_sse(resp)
+            parsed = parse_agent_structured_reply(answer)
+            if parsed is not None:
+                return parsed
             return {"answer": answer or "Agent 无文本回复", "business_payload": None}
         resp = await client.post(
             f"{DIFY_BASE}/v1/workflows/run",
             headers=headers,
-            json={"inputs": {"query": query}, "response_mode": "blocking", "user": "platform2"},
+            json={"inputs": inputs, "response_mode": "blocking", "user": "platform2"},
         )
         resp.raise_for_status()
         data = resp.json().get("data") or {}
@@ -275,24 +371,130 @@ def _llm_unavailable_message(provider: str) -> str:
 
 
 def _infer_business_kind(query: str, app: dict[str, Any] | None = None) -> str | None:
-    """Map utterance / registry row to platform business payload type."""
+    """Map utterance / registry row to platform business payload type.
+
+    Layer phrases are matched on the user text first so registry keywords
+    such as 「检测」do not collapse every step into a task list.
+    """
+    q = query.lower()
+    if any(k in q for k in ("关联态势", "时空关联")):
+        return "associated_situation"
+    if any(k in q for k in ("检测图像", "加载图像")):
+        return "detection_images"
+    if any(k in q for k in ("检测航迹", "加载航迹")):
+        return "detection_tracks"
+    if "检测点" in q:
+        return "detection_points"
+    if "打开任务" in q:
+        return "task_open"
+    if any(k in q for k in ("任务列表", "查询任务", "检测任务", "当前任务")):
+        return "task_list"
+    if any(k in q for k in ("态势", "飞机", "点位", "空域", "realtime", "aircraft", "situation")):
+        return "aircraft_situation"
     blob = " ".join(
         [
-            query,
             str((app or {}).get("app_id") or ""),
             str((app or {}).get("name") or ""),
             str((app or {}).get("keywords") or ""),
             str((app or {}).get("intent_desc") or ""),
         ]
     ).lower()
-    if any(k in blob for k in ("任务", "检测", "航迹", "时间轴", "task")):
+    if any(k in blob for k in ("任务", "task")):
         return "task_list"
-    if any(k in blob for k in ("态势", "飞机", "点位", "空域", "realtime", "aircraft", "situation")):
+    if any(k in blob for k in ("态势", "situation", "aircraft")):
         return "aircraft_situation"
     return None
 
 
-async def _fetch_platform_payload(kind: str) -> dict[str, Any] | None:
+_TASK_LAYER = {
+    "task_open": ("", "已打开任务"),
+    "detection_points": ("/detections", "已加载检测点"),
+    "detection_tracks": ("/tracks", "已加载检测航迹"),
+    "detection_images": ("/images", "已加载检测图像"),
+    "associated_situation": ("/associated-situation", "已加载时空关联态势点"),
+}
+
+# 与 web/src/modules/taskTrack/actionCatalog.js 保持一致
+_DEFAULT_NEXT_ACTIONS: dict[str, list[dict[str, str]]] = {
+    "task_list": [{"id": "open_task", "label": "打开任务", "utterance": "打开任务"}],
+    "task_open": [
+        {"id": "load_points", "label": "加载检测点", "utterance": "加载检测点"},
+        {"id": "load_tracks", "label": "加载检测航迹", "utterance": "加载检测航迹"},
+    ],
+    "detection_points": [
+        {"id": "load_tracks", "label": "加载检测航迹", "utterance": "加载检测航迹"},
+        {"id": "load_images", "label": "加载检测图像", "utterance": "加载检测图像"},
+        {"id": "load_associated", "label": "加载时空关联态势点", "utterance": "加载时空关联态势点"},
+    ],
+    "detection_tracks": [
+        {"id": "load_images", "label": "加载检测图像", "utterance": "加载检测图像"},
+        {"id": "load_associated", "label": "加载时空关联态势点", "utterance": "加载时空关联态势点"},
+    ],
+    "detection_images": [
+        {"id": "load_associated", "label": "加载时空关联态势点", "utterance": "加载时空关联态势点"},
+        {"id": "load_points", "label": "加载检测点", "utterance": "加载检测点"},
+    ],
+    "associated_situation": [
+        {"id": "load_tracks", "label": "加载检测航迹", "utterance": "加载检测航迹"},
+        {"id": "load_images", "label": "加载检测图像", "utterance": "加载检测图像"},
+    ],
+}
+
+
+def _filter_next_actions(
+    actions: list[Any],
+    done_ids: list[str] | None = None,
+) -> list[dict[str, str]]:
+    done = set(done_ids or [])
+    out: list[dict[str, str]] = []
+    for item in actions:
+        if not isinstance(item, dict):
+            continue
+        aid = str(item.get("id") or "").strip()
+        if aid and aid in done:
+            continue
+        utterance = str(item.get("utterance") or "").strip()
+        if not utterance:
+            continue
+        out.append(
+            {
+                "id": aid or utterance,
+                "label": str(item.get("label") or utterance),
+                "utterance": utterance,
+            }
+        )
+    return out
+
+
+def _with_default_next_actions(
+    payload: dict[str, Any],
+    done_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload.get("type"):
+        return payload
+    enriched = dict(payload)
+    if isinstance(payload.get("next_actions"), list) and payload["next_actions"]:
+        enriched["next_actions"] = _filter_next_actions(payload["next_actions"], done_ids)
+        return enriched
+    defaults = _DEFAULT_NEXT_ACTIONS.get(str(payload["type"]))
+    if not defaults:
+        return enriched
+    enriched["next_actions"] = _filter_next_actions(list(defaults), done_ids)
+    return enriched
+
+
+async def _resolve_task_id(client: httpx.AsyncClient, headers: dict[str, str], task_id: str | None) -> str | None:
+    if task_id:
+        return task_id
+    resp = await client.get(f"{PLATFORM_API}/api/v1/internal/situation/task/list", headers=headers)
+    resp.raise_for_status()
+    tasks = resp.json().get("tasks") or []
+    if not tasks:
+        return None
+    return str(tasks[0].get("id") or "") or None
+
+
+async def _fetch_platform_payload(kind: str, task_id: str | None = None) -> dict[str, Any] | None:
     headers = {"Authorization": f"Bearer {SERVICE_TOKEN}"}
     async with httpx.AsyncClient(timeout=10.0) as client:
         if kind == "aircraft_situation":
@@ -319,6 +521,32 @@ async def _fetch_platform_payload(kind: str) -> dict[str, Any] | None:
                 "data": {"tasks": tasks},
                 "answer": f"当前共 {len(tasks)} 个检测任务。",
             }
+        layer = _TASK_LAYER.get(kind)
+        if layer is None:
+            return None
+        resolved = await _resolve_task_id(client, headers, task_id)
+        if not resolved:
+            return {
+                "type": kind,
+                "data": {},
+                "answer": "没有可打开的检测任务。",
+            }
+        suffix, label = layer
+        resp = await client.get(
+            f"{PLATFORM_API}/api/v1/internal/situation/task/{resolved}{suffix}",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        count = body.get("count")
+        if kind == "task_open":
+            name = (body.get("task") or {}).get("name") or resolved
+            answer = f"已打开任务 {name}。"
+        elif count is None:
+            answer = f"{label}。"
+        else:
+            answer = f"{label} {count} 条。"
+        return {"type": kind, "data": body, "answer": answer}
     return None
 
 
@@ -326,35 +554,44 @@ async def _ensure_business_payload(
     query: str,
     app: dict[str, Any] | None,
     outputs: dict[str, Any],
+    task_id: str | None = None,
+    done_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Attach platform points/tasks when Dify Agent only returns plain text."""
+    """Attach platform JSON when Dify Agent only returns plain text."""
     payload = outputs.get("business_payload")
     if isinstance(payload, dict) and payload.get("type"):
+        outputs = dict(outputs)
+        outputs["business_payload"] = _with_default_next_actions(payload, done_ids)
         return outputs
     kind = _infer_business_kind(query, app)
     if not kind:
         return outputs
     try:
-        fetched = await _fetch_platform_payload(kind)
+        fetched = await _fetch_platform_payload(kind, task_id)
     except Exception:
         return outputs
     if not fetched:
         return outputs
     merged = dict(outputs)
-    merged["business_payload"] = {"type": fetched["type"], "data": fetched["data"]}
+    merged["business_payload"] = _with_default_next_actions(
+        {"type": fetched["type"], "data": fetched["data"]},
+        done_ids,
+    )
     answer = str(merged.get("answer") or "").strip()
     if not answer or answer in {"工作流已完成。", "Agent 无文本回复"}:
         merged["answer"] = fetched["answer"]
-    elif fetched["type"] == "aircraft_situation":
-        points = fetched["data"].get("points") or []
-        merged["answer"] = f"{answer}\n（已加载 {len(points)} 个态势点位到三维球）"
-    elif fetched["type"] == "task_list":
-        tasks = fetched["data"].get("tasks") or []
-        merged["answer"] = f"{answer}\n（已打开 {len(tasks)} 个检测任务）"
+    else:
+        merged["answer"] = f"{answer}\n（{fetched['answer']}）"
     return merged
 
 
-async def stream_chat(session_id: str, query: str) -> AsyncIterator[str]:
+async def stream_chat(
+    session_id: str,
+    query: str,
+    task_id: str | None = None,
+    done: str | None = None,
+) -> AsyncIterator[str]:
+    done_ids = _parse_done_ids(done)
     yield _sse({"event_type": "thinking", "content": "正在连接智能体…", "session_id": session_id})
     try:
         apps = await _load_apps()
@@ -368,12 +605,15 @@ async def stream_chat(session_id: str, query: str) -> AsyncIterator[str]:
         kind = _infer_business_kind(query)
         if kind:
             try:
-                fetched = await _fetch_platform_payload(kind)
+                fetched = await _fetch_platform_payload(kind, task_id)
             except Exception as exc:
                 yield _sse({"event_type": "answer", "content": f"平台业务查询失败：{exc}"})
                 return
             if fetched:
-                payload = {"type": fetched["type"], "data": fetched["data"]}
+                payload = _with_default_next_actions(
+                    {"type": fetched["type"], "data": fetched["data"]},
+                    done_ids,
+                )
                 yield _sse(
                     {
                         "event_type": "tool_result",
@@ -410,13 +650,15 @@ async def stream_chat(session_id: str, query: str) -> AsyncIterator[str]:
         }
     )
     try:
-        outputs = await _run_dify(hit, query)
-        outputs = await _ensure_business_payload(query, hit, outputs)
+        outputs = await _run_dify(hit, query, task_id, done)
+        outputs = await _ensure_business_payload(query, hit, outputs, task_id, done_ids)
     except Exception as exc:
         yield _sse({"event_type": "answer", "content": f"Dify 调用失败：{exc}"})
         return
 
     payload = outputs.get("business_payload")
+    if isinstance(payload, dict):
+        payload = _with_default_next_actions(payload, done_ids)
     answer = str(outputs.get("answer") or "工作流已完成。")
     yield _sse(
         {
@@ -450,5 +692,13 @@ def health():
 
 
 @app.get("/v1/chat/stream")
-async def chat_stream(session_id: str = Query(...), q: str = Query(...)):
-    return StreamingResponse(stream_chat(session_id, q), media_type="text/event-stream")
+async def chat_stream(
+    session_id: str = Query(...),
+    q: str = Query(...),
+    task_id: str | None = Query(default=None),
+    done: str | None = Query(default=None, description="前端已完成行为 id，逗号分隔"),
+):
+    return StreamingResponse(
+        stream_chat(session_id, q, task_id, done),
+        media_type="text/event-stream",
+    )
