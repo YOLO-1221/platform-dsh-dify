@@ -41,28 +41,17 @@ TOOLS = [
 
 
 def _read_message() -> dict[str, Any] | None:
-    headers: dict[str, str] = {}
     while True:
         line = sys.stdin.buffer.readline()
         if not line:
             return None
-        if line in (b"\r\n", b"\n"):
-            break
-        if b":" not in line:
-            continue
-        key, value = line.decode("utf-8", "replace").split(":", 1)
-        headers[key.strip().lower()] = value.strip()
-    length = int(headers.get("content-length", "0"))
-    if length <= 0:
-        return None
-    raw = sys.stdin.buffer.read(length)
-    return json.loads(raw.decode("utf-8"))
+        if line.strip():
+            return json.loads(line.decode("utf-8"))
 
 
 def _write_message(payload: dict[str, Any]) -> None:
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    sys.stdout.buffer.write(f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body)
-    sys.stdout.buffer.flush()
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
 
 
 def _split_keywords(text: str) -> list[str]:

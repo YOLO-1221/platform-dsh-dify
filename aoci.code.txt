@@ -5,7 +5,7 @@
 AGENTS.md[SG9S]: F:规定Agent接入、使用与维护本仓库AOCI认知的强制合同 | R:code:.cursor/mcp.json | A:aoci区块定义rules/overview/maintain/update_entry入口与收尾义务 | S:Entry语义必须来自对真实证据的理解，禁止仅凭路径、AST或模板生成；压缩handoff不得保留Whole-Index正文
 .gitignore[FV5T]: F:忽略venv、node_modules、dist、.run、.dsh-home、harness构建与Dify机密 | R:- | A:web/server构建产物、.run运行态与dify/docker/.env、volumes不入库 | S:dify源码可入库；.aoci/ledger与verify_history本地审计也不入库
 README.md[SG7T]: F:说明platform2前后端、PostgreSQL、官方Dify与dsh启动 | R:code:start.sh,code:scripts/start-ai-stack.sh,code:scripts/dsh | A:分步启动与./start.sh一键栈；默认operator/admin账号 | S:对话走:3081 harness-bridge，勿与dsh web抢:3080；Dify Compose占宿主5001
-start.sh[OW7M]: F:一键启动/停止/查询API、web、bridge、dsh与Dify | R:code:stop.sh,code:scripts/start-ai-stack.sh,code:scripts/dsh | A:./start.sh与status/stop；PID写入.run | S:Docker不可用时跳过Dify继续本地服务；勿在同一行粘贴start+status+stop
+start.sh[OW7M]: F:一键启动/停止/查询API、web、bridge、dsh与Dify | R:code:stop.sh,code:scripts/start-ai-stack.sh,code:scripts/dsh | A:./start.sh与status/stop；PID与日志写入.run；启动前可选加载.run/llm.env | S:PLATFORM2_API_PORT可覆盖默认8000；Docker不可用时跳过Dify；勿在同一行粘贴start+status+stop
 stop.sh[OW4T]: F:转发到start.sh stop停止整栈 | R:code:start.sh | A:./stop.sh | S:-
 
 ===/Users/yolo/project/VueProject/2026/platform2/.cursor/===
@@ -69,7 +69,7 @@ README.md[SG4T]: F:Vite模板说明前端开发命令 | R:code:web/package.json 
 index.html[EU5T]: F:前端入口HTML并加载IBM Plex与Noto字体 | R:code:web/src/main.js | A:挂载#app与module脚本 | S:-
 package.json[FV7T]: F:声明前端依赖与脚本，含Cesium与vis-timeline | R:code:web/vite.config.js | A:vue/pinia/element-plus/cesium/vis-timeline | S:-
 pnpm-lock.yaml[FV5L]: F:锁定pnpm依赖树以保证可复现安装 | R:code:web/package.json | A:lockfile完整解析结果 | S:勿手工编辑；改依赖后应pnpm install重生
-vite.config.js[RV7T]: F:配置Vue/Cesium插件、@别名与/api代理到8000 | R:code:web/package.json | A:vite-plugin-cesium与proxy | S:/api代理目标为127.0.0.1:8000
+vite.config.js[RV7T]: F:配置Vue/Cesium插件、@别名与/api代理 | R:code:web/package.json | A:vite-plugin-cesium与proxy | S:/api代理目标读PLATFORM2_API_PORT，默认127.0.0.1:8000
 
 ===/Users/yolo/project/VueProject/2026/platform2/web/.vscode/===
 extensions.json[XV3T]: F:推荐VSCode/Vue扩展 | R:- | A:recommendations列表 | S:-
@@ -140,7 +140,7 @@ requirements.txt[FV4T]: F:锁定本机Dify与Harness桥的Python依赖 | R:code:
 app.py[IA6S]: F:提供OpenAI兼容本地智能体作为DeepSeek兜底 | R:code:services/harness_bridge/app.py | A:POST /v1/chat/completions | S:识别路由JSON提示时只返回app_id；普通闲聊给平台能力说明
 
 ===/Users/yolo/project/VueProject/2026/platform2/services/dify_mcp/===
-server.py[IA7M]: F:按关键字把用户原话路由到已登记Dify应用 | R:code:server/app/api/v1/internal.py | A:stdio MCP工具route_dify_message与list_dify_agents | S:最长关键字优先；Agent走chat-messages、Workflow走workflows/run；无Key只返回说明
+server.py[IA7M]: F:按关键字把用户原话路由到已登记Dify应用 | R:code:server/app/api/v1/internal.py | A:stdio MCP工具route_dify_message与list_dify_agents | S:stdio使用按行JSON-RPC分帧；最长关键字优先；Agent走chat-messages、Workflow走workflows/run；无Key只返回说明
 
 ===/Users/yolo/project/VueProject/2026/platform2/.cursor/hooks/===
 aoci-stop-remind.sh[XO6S]: F:对话结束时若漂移或有脏标记则强制AOCI收尾跟进 | R:code:.cursor/hooks.json,code:doc/AOCI_MAINTAIN.md | A:verify对齐则清dirty；否则followup_message要求maintain | S:仅completed且loop_count<2；无aoci则仍可凭dirty催促

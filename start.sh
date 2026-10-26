@@ -9,7 +9,14 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 RUN="$ROOT/.run"
 mkdir -p "$RUN"
 
-API_PORT=8000
+# Optional local LLM overrides; .run is gitignored.
+if [[ -f "$RUN/llm.env" ]]; then
+  set -a
+  source "$RUN/llm.env"
+  set +a
+fi
+
+API_PORT="${PLATFORM2_API_PORT:-8000}"
 WEB_PORT=5173
 DIFY_PORT=5001
 BRIDGE_PORT=3081

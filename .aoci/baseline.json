@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-16T01:35:45Z",
-  "updated_at": "2026-10-19T13:10:14Z",
+  "updated_at": "2026-10-23T04:27:07Z",
   "files": {
     ".cursor/hooks.json": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "8779e76c3bc71b3901d9c34e7f9493cf3ed3d781666a37d729a216f4751e99d7",
-      "size": 19776,
-      "normalized_sha256": "8779e76c3bc71b3901d9c34e7f9493cf3ed3d781666a37d729a216f4751e99d7"
+      "sha256": "5ce039d2682c9f9bec394be76108b37825e45e3b4fcd35b0e5e4ad18eba31a6f",
+      "size": 19897,
+      "normalized_sha256": "5ce039d2682c9f9bec394be76108b37825e45e3b4fcd35b0e5e4ad18eba31a6f"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -299,9 +299,9 @@
     },
     "services/dify_mcp/server.py": {
       "role": "index",
-      "sha256": "987f73624d1058634e5bf309a6d20d80b401c349496f1fc4ab28efa0c3507efd",
-      "size": 9470,
-      "normalized_sha256": "987f73624d1058634e5bf309a6d20d80b401c349496f1fc4ab28efa0c3507efd"
+      "sha256": "833c0a0423df2278811362a28630b8e89302c5a242bad7e29965f4c7077f507b",
+      "size": 9017,
+      "normalized_sha256": "833c0a0423df2278811362a28630b8e89302c5a242bad7e29965f4c7077f507b"
     },
     "services/harness_bridge/app.py": {
       "role": "index",
@@ -323,9 +323,9 @@
     },
     "start.sh": {
       "role": "index",
-      "sha256": "c163a8dd402064988005ee3a8b22322bd43d92557efa9acd863081bcfb8047f8",
-      "size": 7348,
-      "normalized_sha256": "c163a8dd402064988005ee3a8b22322bd43d92557efa9acd863081bcfb8047f8"
+      "sha256": "b3ba4510accbb13580a7f5d877d342d256ed9c3299d9123bee08f419fb7a6cf3",
+      "size": 7504,
+      "normalized_sha256": "b3ba4510accbb13580a7f5d877d342d256ed9c3299d9123bee08f419fb7a6cf3"
     },
     "stop.sh": {
       "role": "index",
@@ -526,9 +526,9 @@
     },
     "web/vite.config.js": {
       "role": "index",
-      "sha256": "523bc04b9079c67a50c091af710eff4b94c7f09e67fd2b6b7208afb3e589f342",
-      "size": 469,
-      "normalized_sha256": "523bc04b9079c67a50c091af710eff4b94c7f09e67fd2b6b7208afb3e589f342"
+      "sha256": "faee3ecbcbb51eede78fd89293c7d85dbe4e0463b85d69029c57bd8304fa0fd4",
+      "size": 533,
+      "normalized_sha256": "faee3ecbcbb51eede78fd89293c7d85dbe4e0463b85d69029c57bd8304fa0fd4"
     }
   },
   "managed_scope": {
